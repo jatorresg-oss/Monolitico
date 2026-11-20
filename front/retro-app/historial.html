@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial - Retrospectivas Ágiles</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-history" aria-hidden="true"></i> Historial de Retrospectivas</h1>
+                <p class="subtitle">Seguimiento de la mejora continua</p>
+            </div>
+        </header>
+
+        <nav class="nav-tabs" role="tablist" aria-label="Navegación principal">
+            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('dashboard.html')">
+                <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Dashboard
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('sprints.html')">
+                <i class="fas fa-calendar-alt" aria-hidden="true"></i> Sprints
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('retrospectiva.html')">
+                <i class="fas fa-comments" aria-hidden="true"></i> Retrospectiva
+            </button>
+            <button class="tab-btn active" role="tab" aria-selected="true">
+                <i class="fas fa-history" aria-hidden="true"></i> Historial
+            </button>
+        </nav>
+
+        <main class="main-content" role="main" id="main-content">
+            <div class="service-status" id="services-status"></div>
+
+            <div class="panel-header">
+                <h2><i class="fas fa-history" aria-hidden="true"></i> Historial de Retrospectivas</h2>
+            </div>
+
+            <!-- Filtro de Sprint -->
+            <div class="historial-filters">
+                <form style="display: flex; gap: 12px; flex-wrap: wrap; align-items: end;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 250px;">
+                        <label for="filter-sprint">Filtrar por Sprint</label>
+                        <select id="filter-sprint" class="form-control" aria-label="Filtrar historial por sprint">
+                            <option value="">-- Todos los sprints --</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+
+            <div class="historial-content" id="historial-content">
+                <div class="empty-state">
+                    <i class="fas fa-history"></i>
+                    <h3>No hay retrospectivas registradas</h3>
+                    <p>Crea un sprint y registra tu primera retrospectiva</p>
+                    <a href="sprints.html" class="btn btn-primary" style="margin-top: 16px;"><i class="fas fa-plus" aria-hidden="true"></i> Crear primer sprint</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script type="module" src="js/historial.js"></script>
+    <script>
+        function navigateTo(page) { window.location.href = page; }
+    </script>
+</body>
+</html>

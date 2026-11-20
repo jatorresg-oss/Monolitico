@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Item Form - Retrospectivas Ágiles</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <h1 id="page-title"><i class="fas fa-plus" aria-hidden="true"></i> Agregar Item</h1>
+                <p class="subtitle" id="page-subtitle">Sin sprint asignado</p>
+            </div>
+        </header>
+
+        <nav class="nav-tabs" role="tablist" aria-label="Navegación principal">
+            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('dashboard.html')">
+                <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Dashboard
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('sprints.html')">
+                <i class="fas fa-calendar-alt" aria-hidden="true"></i> Sprints
+            </button>
+            <button class="tab-btn active" role="tab" aria-selected="true" onclick="navigateTo('retrospectiva.html')">
+                <i class="fas fa-comments" aria-hidden="true"></i> Retrospectiva
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('historial.html')">
+                <i class="fas fa-history" aria-hidden="true"></i> Historial
+            </button>
+        </nav>
+
+        <main class="main-content" role="main" id="main-content">
+            <div class="service-status" id="services-status"></div>
+
+            <div class="panel-header">
+                <h2 id="panel-title"><i class="fas fa-plus" aria-hidden="true"></i> Agregar Item</h2>
+                <div class="panel-actions" id="panel-actions"></div>
+            </div>
+
+            <div style="max-width: 600px;">
+                <form id="item-form" novalidate>
+                    <input type="hidden" id="item-id" name="id">
+                    <input type="hidden" id="item-sprint-id" name="sprint_id">
+                    <input type="hidden" id="item-retro-id" name="retrospective_id">
+                    <input type="hidden" id="item-categoria" name="categoria">
+                    
+                    <!-- Category indicator -->
+                    <div id="category-badge" class="category-badge" style="margin-bottom: 20px; justify-content: center; font-size: 0.875rem;">
+                        <i class="fas fa-trophy" aria-hidden="true"></i> Logro
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="descripcion">Descripción <span class="required" aria-hidden="true">*</span></label>
+                        <textarea id="descripcion" name="descripcion" class="form-control" required rows="5" 
+                                  placeholder="Describa el punto a tratar..." autofocus></textarea>
+                        <p class="help-text">Escribe una descripción clara y concisa</p>
+                    </div>
+                    
+                    <!-- Action-specific fields -->
+                    <div id="action-fields" style="display: none;">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="cumplida" name="cumplida" value="1" aria-label="Marcar acción como cumplida">
+                                <span class="checkmark" aria-hidden="true"></span>
+                                <span>¿Acción cumplida?</span>
+                            </label>
+                            <p class="help-text">Marca si esta acción ya se completó</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="fecha_revision">Fecha de revisión</label>
+                            <input type="date" id="fecha_revision" name="fecha_revision" class="form-control">
+                            <p class="help-text">Fecha opcional para revisar el cumplimiento</p>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <a href="#" class="btn btn-secondary" id="cancel-btn">Cancelar</a>
+                        <button type="submit" class="btn btn-primary" id="submit-btn">
+                            <i class="fas fa-save" aria-hidden="true"></i> Guardar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script>
+        // Inline functions for item_form.html
+        let currentSprintId = null;
+        let currentRetrospectiveId = null;
+        let currentCategoria = 'positive';
+        let currentItemId = null;
+
+        const labels = {
+            'positive': 'Logro',
+            'negative': 'Impedimento',
+            'action': 'Acción',
+            'comment': 'Comentario'
+        };
+
+        const icons = {
+            'positive': 'trophy',
+            'negative': 'exclamation-triangle',
+            'action': 'tasks',
+            'comment': 'sticky-note'
+        };
+
+        const colors = {
+            'positive': 'var(--success)',
+            'negative': 'var(--danger)',
+            'action': 'var(--primary)',
+            'comment': 'var(--info)'
+        };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            parseURLParams();
+            updateUI();
+            await loadSprintInfo();
+            setupForm();
+            setupKeyboardShortcuts();
+        });
+
+        function parseURLParams() {
+            const params = new URLSearchParams(window.location.search);
+            currentCategoria = params.get('categoria') || 'positive';
+            currentSprintId = params.get('sprint_id') ? parseInt(params.get('sprint_id')) : null;
+            currentRetrospectiveId = params.get('retro_id') ? parseInt(params.get('retro_id')) : null;
+            currentItemId = params.get('id') ? parseInt(params.get('id')) : null;
+        }
+
+        function updateUI() {
+            // Update category badge
+            const badge = document.getElementById('category-badge');
+            if (badge) {
+                badge.className = `category-badge ${currentCategoria}`;
+                badge.innerHTML = `<i class="fas fa-${icons[currentCategoria]}" aria-hidden="true"></i> ${labels[currentCategoria]}`;
+                badge.style.borderLeftColor = colors[currentCategoria];
+            }
+
+            // Show/hide action fields
+            const actionFields = document.getElementById('action-fields');
+            if (actionFields) {
+                actionFields.style.display = currentCategoria === 'action' ? 'block' : 'none';
+            }
+
+            // Update page title
+            const isEdit = currentItemId !== null;
+            document.getElementById('page-title').innerHTML = `<i class="fas fa-${isEdit ? 'edit' : 'plus'}" aria-hidden="true"></i> ${isEdit ? 'Modificar' : 'Agregar'} Item - ${labels[currentCategoria]}`;
+            document.getElementById('panel-title').innerHTML = `<i class="fas fa-${isEdit ? 'edit' : 'plus'}" aria-hidden="true"></i> ${isEdit ? 'Modificar' : 'Agregar'} Item`;
+            document.getElementById('submit-btn').innerHTML = `<i class="fas fa-save" aria-hidden="true"></i> ${isEdit ? 'Modificar' : 'Guardar'}`;
+
+            // Update cancel button
+            const cancelBtn = document.getElementById('cancel-btn');
+            if (cancelBtn && currentSprintId) {
+                cancelBtn.href = `retrospectiva.html?sprint_id=${currentSprintId}`;
+            }
+        }
+
+        async function loadSprintInfo() {
+            if (!currentSprintId) return;
+            
+            try {
+                const response = await fetch(`http://localhost:3001/sprints/${currentSprintId}`);
+                if (response.ok) {
+                    const sprint = await response.json();
+                    document.getElementById('page-subtitle').textContent = `Sprint: ${sprint.name}`;
+                }
+            } catch (e) {
+                console.error('Error loading sprint:', e);
+            }
+        }
+
+        async function setupForm() {
+            const form = document.getElementById('item-form');
+            
+            // Load existing item if editing
+            if (currentItemId) {
+                await loadItem(currentItemId);
+            }
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const descripcion = document.getElementById('descripcion').value.trim();
+                if (!descripcion) {
+                    showToast('La descripción es obligatoria', 'error');
+                    document.getElementById('descripcion').focus();
+                    return;
+                }
+
+                // Use retrospective_id for the API, not sprint_id
+                const retroId = currentRetrospectiveId || currentSprintId;
+                
+                const data = {
+                    retrospective_id: retroId,
+                    type: currentCategoria,
+                    title: descripcion,
+                    description: descripcion,
+                    priority: 'medium',
+                    order_index: 0
+                };
+
+                if (currentCategoria === 'action') {
+                    data.cumplida = document.getElementById('cumplida').checked;
+                    data.fecha_revision = document.getElementById('fecha_revision').value || null;
+                }
+
+                const submitBtn = document.getElementById('submit-btn');
+                submitBtn.classList.add('loading');
+                submitBtn.disabled = true;
+
+                try {
+                    let result;
+                    if (currentItemId) {
+                        result = await updateFeedback(currentItemId, data);
+                        showToast('Item actualizado correctamente', 'success');
+                    } else {
+                        result = await createFeedback(data);
+                        showToast('Item creado correctamente', 'success');
+                    }
+                    
+                    if (currentSprintId) {
+                        window.location.href = `retrospectiva.html?sprint_id=${currentSprintId}`;
+                    }
+                } catch (error) {
+                    console.error('Error saving item:', error);
+                    showToast('Error al guardar el item', 'error');
+                } finally {
+                    submitBtn.classList.remove('loading');
+                    submitBtn.disabled = false;
+                }
+            });
+
+            // Auto-resize textarea
+            const textarea = document.getElementById('descripcion');
+            textarea.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = this.scrollHeight + 'px';
+            });
+        }
+
+        async function loadItem(id) {
+            try {
+                const response = await fetch(`http://localhost:3003/feedbacks/${id}`);
+                if (response.ok) {
+                    const item = await response.json();
+                    document.getElementById('descripcion').value = item.description || item.title;
+                    
+                    // Map API type to UI category
+                    currentCategoria = item.type === 'positive' ? 'positive' : 
+                                      item.type === 'negative' ? 'negative' : 
+                                      item.type === 'action' ? 'action' : 'comment';
+                    currentSprintId = item.retrospective?.sprint_id || currentSprintId;
+                    currentRetrospectiveId = item.retrospective_id || currentRetrospectiveId;
+                    
+                    if (currentCategoria === 'action') {
+                        document.getElementById('cumplida').checked = item.cumplida || false;
+                        document.getElementById('fecha_revision').value = item.fecha_revision || '';
+                    }
+                    
+                    updateUI();
+                }
+            } catch (e) {
+                console.error('Error loading item:', e);
+            }
+        }
+
+        // API functions (inline since ES modules don't work with file://)
+        async function createFeedback(data) {
+            const response = await fetch('http://localhost:3003/feedbacks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error('Error al crear');
+            return response.json();
+        }
+
+        async function updateFeedback(id, data) {
+            const response = await fetch(`http://localhost:3003/feedbacks/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error('Error al actualizar');
+            return response.json();
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', function(e) {
+                if (e.altKey && !e.ctrlKey && !e.metaKey) {
+                    if (e.key === 's') { e.preventDefault(); window.location.href = 'sprints.html'; }
+                    if (e.key === 'r') { e.preventDefault(); window.location.href = 'retrospectiva.html'; }
+                    if (e.key === 'h') { e.preventDefault(); window.location.href = 'historial.html'; }
+                    if (e.key === 'd') { e.preventDefault(); window.location.href = 'dashboard.html'; }
+                }
+                if (e.key === 'Escape') {
+                    document.querySelectorAll('.modal.active, .toast').forEach(el => el.remove());
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                warning: 'fa-exclamation-triangle',
+                info: 'fa-info-circle'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'polite');
+            toast.innerHTML = `
+                <i class="fas ${icons[type] || icons.info} toast-icon" aria-hidden="true"></i>
+                <span class="toast-message">${escapeHtml(message)}</span>
+                <button class="toast-close" aria-label="Cerrar notificación">&times;</button>
+            `;
+
+            toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
+            container.appendChild(toast);
+
+            setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
+        }
+
+        function navigateTo(page) { window.location.href = page; }
+    </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retrospectiva - Retrospectivas Ágiles</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-comments" aria-hidden="true"></i> Registrar Retrospectiva</h1>
+                <p class="subtitle">Mejora continua para equipos Scrum</p>
+            </div>
+        </header>
+
+        <nav class="nav-tabs" role="tablist" aria-label="Navegación principal">
+            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('dashboard.html')">
+                <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Dashboard
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('sprints.html')">
+                <i class="fas fa-calendar-alt" aria-hidden="true"></i> Sprints
+            </button>
+            <button class="tab-btn active" role="tab" aria-selected="true">
+                <i class="fas fa-comments" aria-hidden="true"></i> Retrospectiva
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('historial.html')">
+                <i class="fas fa-history" aria-hidden="true"></i> Historial
+            </button>
+        </nav>
+
+        <main class="main-content" role="main" id="main-content">
+            <div class="service-status" id="services-status"></div>
+
+            <div class="panel-header">
+                <h2><i class="fas fa-comments" aria-hidden="true"></i> Registrar Retrospectiva</h2>
+            </div>
+
+            <!-- Sprint Selector -->
+            <div class="sprint-selector">
+                <label for="sprint-selector">Seleccionar Sprint</label>
+                <select id="sprint-selector" class="form-control" aria-label="Seleccionar Sprint">
+                    <option value="">-- Seleccionar Sprint --</option>
+                </select>
+            </div>
+
+            <!-- Previous Actions -->
+            <div id="previous-actions"></div>
+
+            <!-- Retrospective Content -->
+            <div id="retro-content">
+                <div class="empty-state">
+                    <i class="fas fa-info-circle"></i>
+                    <h3>Seleccione un sprint</h3>
+                    <p>Elija un sprint del desplegable para comenzar a registrar la retrospectiva</p>
+                    <a href="sprints.html" class="btn btn-primary" style="margin-top: 16px;"><i class="fas fa-plus" aria-hidden="true"></i> Crear nuevo sprint</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script type="module" src="js/retrospectiva.js"></script>
+    <script>
+        function navigateTo(page) { window.location.href = page; }
+    </script>
+</body>
+</html>
