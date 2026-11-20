@@ -1,2 +1,3 @@
 <?php
-header("Location: views/sprints.php");
+header("Location: front/views/sprints.php");
+exit;
