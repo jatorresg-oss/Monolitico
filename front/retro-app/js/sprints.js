@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
     await loadSprints();
     setupForm();
-    setupKeyboardShortcuts();
 });
 
 async function checkServicesStatus() {
@@ -210,25 +209,6 @@ function setupForm() {
     // Close modal on overlay click
     document.getElementById('sprint-modal')?.addEventListener('click', (e) => {
         if (e.target.id === 'sprint-modal') closeSprintModal();
-    });
-
-    // Close modal on Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeSprintModal();
-    });
-}
-
-function setupKeyboardShortcuts() {
-    document.addEventListener('keydown', function(e) {
-        if (e.altKey && !e.ctrlKey && !e.metaKey) {
-            if (e.key === 's') { e.preventDefault(); window.location.href = 'sprints.html'; }
-            if (e.key === 'r') { e.preventDefault(); window.location.href = 'retrospectiva.html'; }
-            if (e.key === 'h') { e.preventDefault(); window.location.href = 'historial.html'; }
-            if (e.key === 'd') { e.preventDefault(); window.location.href = 'dashboard.html'; }
-        }
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal.active, .toast').forEach(el => el.remove());
-        }
     });
 }
 

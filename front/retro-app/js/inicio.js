@@ -17,7 +17,6 @@ let currentRetrospectives = [];
 document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
     await loadDashboard();
-    setupKeyboardShortcuts();
 });
 
 async function checkServicesStatus() {
@@ -212,20 +211,6 @@ function showToast(message, type = 'info') {
     container.appendChild(toast);
 
     setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
-}
-
-function setupKeyboardShortcuts() {
-    document.addEventListener('keydown', function(e) {
-        if (e.altKey && !e.ctrlKey && !e.metaKey) {
-            if (e.key === 'd') { e.preventDefault(); window.location.href = 'dashboard.html'; }
-            if (e.key === 's') { e.preventDefault(); window.location.href = 'sprints.html'; }
-            if (e.key === 'r') { e.preventDefault(); window.location.href = 'retrospectiva.html'; }
-            if (e.key === 'h') { e.preventDefault(); window.location.href = 'historial.html'; }
-        }
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal.active, .toast').forEach(el => el.remove());
-        }
-    });
 }
 
 window.showToast = showToast;

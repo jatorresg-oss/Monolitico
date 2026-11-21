@@ -23,7 +23,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
     await loadSprints();
     setupFilter();
-    setupKeyboardShortcuts();
     
     // Check for sprint_id in URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -224,20 +223,6 @@ function renderHistory() {
             </article>
         `;
     }).join('');
-}
-
-function setupKeyboardShortcuts() {
-    document.addEventListener('keydown', function(e) {
-        if (e.altKey && !e.ctrlKey && !e.metaKey) {
-            if (e.key === 's') { e.preventDefault(); window.location.href = 'sprints.html'; }
-            if (e.key === 'r') { e.preventDefault(); window.location.href = 'retrospectiva.html'; }
-            if (e.key === 'h') { e.preventDefault(); window.location.href = 'historial.html'; }
-            if (e.key === 'd') { e.preventDefault(); window.location.href = 'dashboard.html'; }
-        }
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal.active, .toast').forEach(el => el.remove());
-        }
-    });
 }
 
 function showLoading(show) {
