@@ -8,6 +8,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body>
+    <script>
+        const API_HOST = '127.0.0.1';
+        const SPRINT_API = `http://${API_HOST}:3001`;
+        const RETROSPECTIVE_API = `http://${API_HOST}:3002`;
+        const FEEDBACK_API = `http://${API_HOST}:3003`;
+    </script>
     <div class="app-container">
         <header class="header">
             <div class="header-content">
@@ -124,6 +130,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             parseURLParams();
             updateUI();
+            await loadSprintInfo();
             setupForm();
 
             // Load item if editing from URL parameter
@@ -135,8 +142,24 @@
             currentCategoria = params.get('categoria') || 'logro';
             if (!labels[currentCategoria]) currentCategoria = 'logro';
             currentSprintId = params.get('sprint_id') ? parseInt(params.get('sprint_id'), 10) : null;
-            currentRetrospectiveId = params.get('retro_id') ? parseInt(params.get('retro_id')) : null;
+            currentRetrospectiveId = params.get('retro_id')
+                ? parseInt(params.get('retro_id'))
+                : currentSprintId;
             currentItemId = params.get('id') ? parseInt(params.get('id')) : null;
+        }
+
+        async function loadSprintInfo() {
+            if (!currentSprintId) return;
+
+            try {
+                const response = await fetch(`${SPRINT_API}/sprints/${currentSprintId}`);
+                if (!response.ok) throw new Error('No se pudo cargar el sprint');
+                const sprint = await response.json();
+                document.getElementById('page-subtitle').textContent = `Sprint: ${sprint.nombre}`;
+            } catch (error) {
+                console.error('Error loading sprint:', error);
+                showToast('Error al cargar el sprint', 'error');
+            }
         }
 
         function updateUI() {
@@ -220,7 +243,7 @@
                     
                     // Get the retrospective to redirect back
                     // We need the sprint_id for redirect
-                    const response = await fetch(`http://localhost:3002/retrospectives/${currentRetrospectiveId}`);
+                    const response = await fetch(`${RETROSPECTIVE_API}/retrospectives/${currentRetrospectiveId}`);
                     if (response.ok) {
                         const retro = await response.json();
                         window.location.href = `retrospectiva.html?sprint_id=${retro.sprint_id}`;
@@ -246,7 +269,7 @@
 
         async function loadItem(id) {
             try {
-                const response = await fetch(`http://localhost:3003/feedbacks/${id}`);
+                const response = await fetch(`${FEEDBACK_API}/feedbacks/${id}`);
                 if (!response.ok) throw new Error('No se pudo cargar el item');
 
                 const item = await response.json();
@@ -272,7 +295,7 @@
 
         // API functions
         async function createFeedback(data) {
-            const response = await fetch('http://localhost:3003/feedbacks', {
+            const response = await fetch(`${FEEDBACK_API}/feedbacks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -282,7 +305,7 @@
         }
 
         async function updateFeedback(id, data) {
-            const response = await fetch(`http://localhost:3003/feedbacks/${id}`, {
+            const response = await fetch(`${FEEDBACK_API}/feedbacks/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -292,7 +315,7 @@
         }
 
         async function getFeedback(id) {
-            const response = await fetch(`http://localhost:3003/feedbacks/${id}`);
+            const response = await fetch(`${FEEDBACK_API}/feedbacks/${id}`);
             if (!response.ok) throw new Error('No se pudo cargar el item');
             return response.json();
         }

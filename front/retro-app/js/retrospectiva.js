@@ -281,7 +281,7 @@ function renderPreviousActions() {
                             <input type="hidden" name="id" value="${action.id}">
                             <input type="hidden" name="sprint_id" value="${currentSprintId}">
                             <label class="checkbox-label">
-                                <input type="checkbox" name="cumplida" value="1" ${action.status === 'completed' ? 'checked' : ''} aria-label="Marcar acción como cumplida">
+                                <input type="checkbox" name="cumplida" value="1" ${action.status === 'completed' ? 'checked' : ''} aria-label="Marcar acción como cumplida" onchange="this.form.requestSubmit()">
                                 <span class="checkmark" aria-hidden="true"></span>
                             </label>
                             <div class="accion-anterior-texto">${escapeHtml(action.description || action.title)}</div>

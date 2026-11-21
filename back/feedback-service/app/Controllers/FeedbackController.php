@@ -51,7 +51,10 @@ class FeedbackController
     public function create(array $data): array
     {
         $normalized = $this->normalize($data);
-        if (empty($normalized['sprint_id']) || empty($normalized['categoria']) || $normalized['descripcion'] === '') {
+        if (empty($normalized['sprint_id'])
+            || empty($normalized['categoria'])
+            || trim((string) ($normalized['descripcion'] ?? '')) === ''
+        ) {
             throw new InvalidArgumentException('Se requieren sprint_id, categoria y descripcion.');
         }
 
@@ -129,10 +132,20 @@ class FeedbackController
 
     private function normalize(array $data): array
     {
-        $data['sprint_id'] = $data['sprint_id'] ?? $data['retrospective_id'] ?? null;
-        $data['categoria'] = $data['categoria'] ?? $data['type'] ?? null;
-        $data['descripcion'] = $data['descripcion'] ?? $data['description'] ?? $data['title'] ?? null;
-        $data['fecha_revision'] = $data['fecha_revision'] ?? $data['due_date'] ?? null;
+        if (!array_key_exists('sprint_id', $data) && array_key_exists('retrospective_id', $data)) {
+            $data['sprint_id'] = $data['retrospective_id'];
+        }
+        if (!array_key_exists('categoria', $data) && array_key_exists('type', $data)) {
+            $data['categoria'] = $data['type'];
+        }
+        if (!array_key_exists('descripcion', $data)) {
+            if (array_key_exists('description', $data) || array_key_exists('title', $data)) {
+                $data['descripcion'] = $data['description'] ?? $data['title'];
+            }
+        }
+        if (!array_key_exists('fecha_revision', $data) && array_key_exists('due_date', $data)) {
+            $data['fecha_revision'] = $data['due_date'];
+        }
         return $data;
     }
 

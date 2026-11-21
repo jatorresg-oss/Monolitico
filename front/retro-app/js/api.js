@@ -3,7 +3,7 @@
  * Cada microservicio se ejecuta en un puerto distinto.
  */
 
-const API_HOST = window.location.hostname || '127.0.0.1';
+const API_HOST = '127.0.0.1';
 
 const API_BASE = {
     sprints: `http://${API_HOST}:3001`,
