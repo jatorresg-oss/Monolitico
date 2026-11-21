@@ -4,10 +4,12 @@
 
 import {
     getSprints,
-    getItemsBySprint,
-    deleteItem,
+    getRetrospectiveBySprint,
+    getFeedbackByRetrospective,
+    createRetrospective,
+    createFeedbackBulk,
     getPendingActions,
-    updateAction,
+    createActionTracking,
     checkAllServices,
     formatDate,
     formatDateTime,
@@ -21,16 +23,16 @@ import {
 
 let currentSprints = [];
 let currentSprintId = null;
+let currentRetrospectiveId = null;
 let previousActions = [];
 
-const CATEGORY_ORDER = ['logro', 'impedimento', 'accion', 'comentario', 'otro'];
+const CATEGORY_ORDER = ['positive', 'negative', 'action', 'comment'];
 
 const CATEGORY_CONFIG = {
-    logro: { icon: 'trophy', title: 'Logros (¿Qué funcionó bien?)', addLabel: 'Agregar logro' },
-    impedimento: { icon: 'exclamation-triangle', title: 'Impedimentos (¿Qué necesita mejorar?)', addLabel: 'Agregar impedimento' },
-    accion: { icon: 'tasks', title: 'Acciones (Compromisos para el próximo sprint)', addLabel: 'Agregar acción' },
-    comentario: { icon: 'sticky-note', title: 'Comentarios adicionales', addLabel: 'Agregar comentario' },
-    otro: { icon: 'circle', title: 'Otros', addLabel: 'Agregar otro' }
+    positive: { icon: 'trophy', title: 'Logros (¿Qué funcionó bien?)', addLabel: 'Agregar logro' },
+    negative: { icon: 'exclamation-triangle', title: 'Impedimentos (¿Qué necesita mejorar?)', addLabel: 'Agregar impedimento' },
+    action: { icon: 'tasks', title: 'Acciones (Compromisos para el próximo sprint)', addLabel: 'Agregar acción' },
+    comment: { icon: 'sticky-note', title: 'Comentarios Adicionales', addLabel: 'Agregar comentario' }
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -57,8 +59,8 @@ async function checkServicesStatus() {
         <div class="service-badge ${status.sprints ? 'online' : 'offline'}">
             <i class="fas fa-calendar-alt"></i> Sprint ${status.sprints ? '●' : '○'}
         </div>
-        <div class="service-badge ${status.retrospective ? 'online' : 'offline'}">
-            <i class="fas fa-comments"></i> Retro ${status.retrospective ? '●' : '○'}
+        <div class="service-badge ${status.retrospectives ? 'online' : 'offline'}">
+            <i class="fas fa-comments"></i> Retro ${status.retrospectives ? '●' : '○'}
         </div>
         <div class="service-badge ${status.feedback ? 'online' : 'offline'}">
             <i class="fas fa-list"></i> Feedback ${status.feedback ? '●' : '○'}
@@ -86,7 +88,7 @@ function renderSprintSelector() {
     const selected = selector.value;
     selector.innerHTML = '<option value="">-- Seleccionar Sprint --</option>' +
         currentSprints.map(sprint =>
-            `<option value="${sprint.id}">${escapeHtml(sprint.nombre)} (${formatDate(sprint.fecha_inicio)} - ${formatDate(sprint.fecha_fin)})</option>`
+            `<option value="${sprint.id}">${escapeHtml(sprint.nombre)} (${formatDate(sprint.start_date)} - ${formatDate(sprint.end_date)})</option>`
         ).join('');
 
     if (selected) selector.value = selected;
@@ -113,14 +115,34 @@ async function loadRetrospective(sprintId) {
     showLoading(true);
 
     try {
-        const [items, pending] = await Promise.all([
-            getItemsBySprint(sprintId),
-            getPendingActions(sprintId).catch(() => [])
-        ]);
+        // Get retrospective for this sprint
+        let retrospective = null;
+        try {
+            retrospective = await getRetrospectiveBySprint(sprintId);
+        } catch (e) {
+            // No retrospective exists yet
+        }
 
-        previousActions = pending || [];
-        renderRetrospective(items || []);
-        renderPreviousActions();
+        if (retrospective) {
+            currentRetrospective = retrospective;
+            currentRetrospectiveId = retrospective.id;
+            
+            // Get feedback items for this retrospective
+            const [items, pending] = await Promise.all([
+                getFeedbackByRetrospective(retrospective.id),
+                getPendingActions(sprintId).catch(() => [])
+            ]);
+
+            previousActions = pending || [];
+            renderRetrospective(items || []);
+            renderPreviousActions();
+        } else {
+            currentRetrospective = null;
+            currentRetrospectiveId = null;
+            renderRetrospective([]);
+            renderPreviousActions();
+        }
+
     } catch (error) {
         console.error('Error loading retrospective:', error);
         showToast(error.message || 'Error al cargar la retrospectiva', 'error');
@@ -133,17 +155,38 @@ function renderRetrospective(items) {
     const container = document.getElementById('retro-content');
     if (!container) return;
 
-    const itemsByCategory = {};
-    CATEGORY_ORDER.forEach(cat => { itemsByCategory[cat] = []; });
+    // Group items by type (API uses: positive, negative, action, comment)
+    const itemsByType = {
+        positive: [],
+        negative: [],
+        action: [],
+        comment: []
+    };
+
     items.forEach(item => {
-        if (!itemsByCategory[item.categoria]) itemsByCategory[item.categoria] = [];
-        itemsByCategory[item.categoria].push(item);
+        if (!itemsByType[item.type]) itemsByType[item.type] = [];
+        itemsByType[item.type].push(item);
     });
 
-    container.innerHTML = CATEGORY_ORDER.map(cat => {
-        const config = CATEGORY_CONFIG[cat];
-        const categoryItems = itemsByCategory[cat] || [];
-        const addUrl = `item_form.html?categoria=${cat}&sprint_id=${currentSprintId}`;
+    // Map API types to UI categories
+    const typeToCategory = {
+        positive: 'logro',
+        negative: 'impedimento',
+        action: 'accion',
+        comment: 'comentario'
+    };
+
+    const CATEGORY_CONFIG = {
+        logro: { icon: 'trophy', title: 'Logros (¿Qué funcionó bien?)', addLabel: 'Agregar logro', type: 'positive' },
+        impedimento: { icon: 'exclamation-triangle', title: 'Impedimentos (¿Qué necesita mejorar?)', addLabel: 'Agregar impedimento', type: 'negative' },
+        accion: { icon: 'tasks', title: 'Acciones (Compromisos para el próximo sprint)', addLabel: 'Agregar acción', type: 'action' },
+        comentario: { icon: 'sticky-note', title: 'Comentarios Adicionales', addLabel: 'Agregar comentario', type: 'comment' }
+    };
+
+    container.innerHTML = Object.entries(CATEGORY_CONFIG).map(([cat, config]) => {
+        const type = config.type;
+        const typeItems = itemsByType[type] || [];
+        const addUrl = `item_form.html?categoria=${cat}&sprint_id=${currentSprintId}&retro_id=${currentRetrospectiveId}`;
 
         return `
             <section class="retro-section" aria-labelledby="section-${cat}">
@@ -156,52 +199,66 @@ function renderRetrospective(items) {
                     </a>
                 </div>
                 <div class="items-container" id="${cat}-container">
-                    ${categoryItems.length === 0 ? `
+                    ${typeItems.length === 0 ? `
                         <div class="empty-state" style="padding: 30px 16px; border: 2px dashed var(--gray-300); border-radius: var(--radius);">
                             <i class="fas fa-${config.icon}" aria-hidden="true" style="font-size: 2rem; margin-bottom: 8px; opacity: 0.3;"></i>
-                            <p style="font-size: 0.9rem;">No hay ${getCategoryPlural(cat).toLowerCase()} registrados</p>
+                            <p style="font-size: 0.9rem;">No hay ${config.title.toLowerCase()} registrados</p>
                             <a href="${addUrl}" class="btn btn-sm btn-add" style="margin-top: 8px;">
                                 <i class="fas fa-plus" aria-hidden="true"></i> Agregar primero
                             </a>
                         </div>
-                    ` : categoryItems.map(item => renderRetroItem(item)).join('')}
+                    ` : typeItems.map(item => renderRetroItem(item, currentSprintId)).join('')}
                 </div>
             </section>
         `;
     }).join('');
 }
 
-function renderRetroItem(item) {
-    const cat = item.categoria;
+function renderRetroItem(item, sprintId) {
+    const cat = typeToCategory[item.type] || 'comentario';
     const completed = isCompleted(item);
     const classes = ['retro-item', `categoria-${cat}`];
-    if (cat === 'accion') classes.push(completed ? 'cumplida' : 'no-cumplida');
+    if (item.type === 'action') classes.push(completed ? 'cumplida' : 'no-cumplida');
 
-    const metaParts = [
+    const icons = {
+        positive: 'trophy',
+        negative: 'exclamation-triangle',
+        action: 'tasks',
+        comment: 'sticky-note'
+    };
+
+    let metaParts = [
         `<span><i class="fas fa-clock" aria-hidden="true"></i> ${formatDateTime(item.created_at)}</span>`
     ];
 
-    if (cat === 'accion') {
+    if (item.type === 'action') {
         const icon = completed ? 'check-circle' : 'times-circle';
         const color = completed ? 'var(--success)' : 'var(--danger)';
         metaParts.push(`<span style="color: ${color}"><i class="fas fa-${icon}" aria-hidden="true"></i> ${completed ? 'Cumplida' : 'Pendiente'}</span>`);
-        if (item.fecha_revision) {
-            metaParts.push(`<span><i class="fas fa-calendar-check" aria-hidden="true"></i> Revisar: ${formatDate(item.fecha_revision)}</span>`);
+        if (item.due_date) {
+            metaParts.push(`<span><i class="fas fa-calendar-check" aria-hidden="true"></i> Revisar: ${formatDate(item.due_date)}</span>`);
         }
     }
 
+    const catLabels = {
+        positive: 'Logro',
+        negative: 'Impedimento',
+        action: 'Acción',
+        comment: 'Comentario'
+    };
+
     return `
         <article class="${classes.join(' ')}" data-id="${item.id}">
-            <div class="item-icon" aria-hidden="true"><i class="fas fa-${getCategoryIcon(cat)}"></i></div>
+            <div class="item-icon" aria-hidden="true"><i class="fas fa-${icons[item.type] || 'circle'}"></i></div>
             <div class="item-content">
-                <div class="item-text">${escapeHtml(item.descripcion)}</div>
+                <div class="item-text">${escapeHtml(item.description || item.title)}</div>
                 <div class="item-meta">${metaParts.join(' ')}</div>
             </div>
             <div class="item-actions">
-                <a href="item_form.html?id=${item.id}&categoria=${cat}&sprint_id=${currentSprintId}" class="btn btn-icon" aria-label="Editar ${getCategoryLabel(cat)}" title="Editar">
+                <a href="item_form.html?id=${item.id}&categoria=${typeToCategory[item.type]}&sprint_id=${sprintId}&retro_id=${currentRetrospectiveId}" class="btn btn-icon" aria-label="Editar ${catLabels[cat]}" title="Editar">
                     <i class="fas fa-edit" aria-hidden="true"></i>
                 </a>
-                <button class="btn btn-icon" aria-label="Eliminar ${getCategoryLabel(cat)}" title="Eliminar" onclick="confirmDeleteItem(${item.id})">
+                <button class="btn btn-icon" aria-label="Eliminar ${catLabels[cat]}" title="Eliminar" onclick="confirmDeleteItem(${item.id})">
                     <i class="fas fa-trash" aria-hidden="true"></i>
                 </button>
             </div>
@@ -225,17 +282,16 @@ function renderPreviousActions() {
             <div class="acciones-list">
                 ${previousActions.map(action => `
                     <div class="accion-anterior-item">
-                        <label class="checkbox-label accion-anterior-form">
-                            <input type="checkbox" class="accion-anterior-checkbox"
-                                   onchange="updateActionStatus(event, ${action.id})"
-                                   ${isCompleted(action) ? 'checked' : ''}
-                                   aria-label="Marcar acción como cumplida">
-                            <span class="accion-anterior-texto">${escapeHtml(action.descripcion)}</span>
-                            <span class="accion-anterior-fecha">
-                                ${escapeHtml(action.sprint?.nombre || 'Sprint anterior')}
-                                ${action.fecha_revision ? ' · Revisar: ' + formatDate(action.fecha_revision) : ''}
-                            </span>
-                        </label>
+                        <form class="accion-anterior-form" onsubmit="updateActionStatus(event, ${action.id}, ${currentSprintId})">
+                            <input type="hidden" name="id" value="${action.id}">
+                            <input type="hidden" name="sprint_id" value="${currentSprintId}">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="cumplida" value="1" ${action.status === 'completed' ? 'checked' : ''} aria-label="Marcar acción como cumplida">
+                                <span class="checkmark" aria-hidden="true"></span>
+                            </label>
+                            <div class="accion-anterior-texto">${escapeHtml(action.description || action.title)}</div>
+                            <div class="accion-anterior-fecha">${escapeHtml(action.sprint_nombre || 'Sprint anterior')} - ${formatDate(action.created_at)}</div>
+                        </form>
                     </div>
                 `).join('')}
             </div>
@@ -257,22 +313,32 @@ function clearRetrospective() {
     }
     const prevContainer = document.getElementById('previous-actions');
     if (prevContainer) prevContainer.innerHTML = '';
+    currentRetrospective = null;
+    currentRetrospectiveId = null;
     currentSprintId = null;
     previousActions = [];
 }
 
-async function updateActionStatus(event, actionId) {
-    const checkbox = event.target;
-    const cumplida = checkbox.checked;
+async function updateActionStatus(event, feedbackId, sprintId) {
+    event.preventDefault();
+    const form = event.target;
+    const cumplida = form.cumplida.checked;
 
     try {
-        await updateAction(actionId, { cumplida });
+        await createActionTracking({
+            original_feedback_id: feedbackId,
+            review_sprint_id: sprintId,
+            status: cumplida ? 'completed' : 'not_completed',
+            completion_percentage: cumplida ? 100 : 0,
+            comments: '',
+            reviewed_by: 'Usuario'
+        });
         showToast(cumplida ? 'Acción marcada como cumplida' : 'Acción marcada como pendiente', 'success');
-        if (currentSprintId) await loadRetrospective(currentSprintId);
+        await loadRetrospective(sprintId);
     } catch (error) {
         console.error('Error updating action status:', error);
-        showToast(error.message || 'Error al actualizar el estado', 'error');
-        checkbox.checked = !cumplida;
+        showToast('Error al actualizar el estado', 'error');
+        form.cumplida.checked = !cumplida;
     }
 }
 
@@ -280,12 +346,12 @@ async function confirmDeleteItem(id) {
     if (!confirm('¿Está seguro de eliminar este item?')) return;
 
     try {
-        await deleteItem(id);
+        await deleteFeedback(id);
         showToast('Item eliminado correctamente', 'success');
         if (currentSprintId) await loadRetrospective(currentSprintId);
     } catch (error) {
         console.error('Error deleting item:', error);
-        showToast(error.message || 'Error al eliminar el item', 'error');
+        showToast('Error al eliminar el item', 'error');
     }
 }
 
@@ -296,3 +362,4 @@ function showLoading(show) {
 
 window.confirmDeleteItem = confirmDeleteItem;
 window.updateActionStatus = updateActionStatus;
+window.showToast = showToast;

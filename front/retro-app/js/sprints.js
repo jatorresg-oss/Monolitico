@@ -4,7 +4,6 @@
 
 import {
     getSprints,
-    getAllItems,
     createSprint,
     updateSprint,
     deleteSprint,
@@ -15,21 +14,11 @@ import {
 } from './api.js';
 
 let currentSprints = [];
-let allItems = [];
-let currentSprintId = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
     await loadSprints();
     setupForm();
-
-    // Abrir modal desde URL parameter ?id=
-    const urlParams = new URLSearchParams(window.location.search);
-    const id = urlParams.get('id');
-    if (id) {
-        const sprint = currentSprints.find(s => Number(s.id) === Number(id));
-        if (sprint) openSprintModal(sprint.id);
-    }
 });
 
 async function checkServicesStatus() {
@@ -41,8 +30,8 @@ async function checkServicesStatus() {
         <div class="service-badge ${status.sprints ? 'online' : 'offline'}">
             <i class="fas fa-calendar-alt"></i> Sprint Service ${status.sprints ? '●' : '○'}
         </div>
-        <div class="service-badge ${status.retrospective ? 'online' : 'offline'}">
-            <i class="fas fa-comments"></i> Retrospective Service ${status.retrospective ? '●' : '○'}
+        <div class="service-badge ${status.retrospectives ? 'online' : 'offline'}">
+            <i class="fas fa-comments"></i> Retrospective Service ${status.retrospectives ? '●' : '○'}
         </div>
     `;
 }
@@ -50,9 +39,7 @@ async function checkServicesStatus() {
 async function loadSprints() {
     showLoading(true);
     try {
-        const [sprints, items] = await Promise.all([getSprints(), getAllItems()]);
-        currentSprints = sprints || [];
-        allItems = items || [];
+        currentSprints = await getSprints() || [];
         renderSprints();
     } catch (error) {
         console.error('Error loading sprints:', error);
@@ -78,39 +65,51 @@ function renderSprints() {
         return;
     }
 
-    container.innerHTML = currentSprints.map(sprint => {
-        const items = allItems.filter(item => Number(item.sprint_id) === Number(sprint.id));
-        const count = categoria => items.filter(item => item.categoria === categoria).length;
+    container.innerHTML = currentSprints.map(sprint => `
+        <article class="sprint-card" data-sprint-id="${sprint.id}">
+            <div class="sprint-card-header">
+                <h3>${escapeHtml(sprint.name)}</h3>
+                <div class="sprint-card-actions">
+                    <a href="retrospectiva.html?sprint_id=${sprint.id}" class="btn btn-sm btn-add">
+                        <i class="fas fa-comments"></i> Retrospectiva
+                    </a>
+                    <button class="btn btn-secondary btn-sm" onclick="openSprintModal(${sprint.id})">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="confirmDeleteSprint(${sprint.id}, '${escapeHtml(sprint.name)}')">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                </div>
+            </div>
+            <div class="sprint-card-dates">
+                <span><i class="fas fa-play"></i> ${formatDate(sprint.start_date)}</span>
+                <span><i class="fas fa-stop"></i> ${formatDate(sprint.end_date)}</span>
+            </div>
+            <div class="sprint-card-stats">
+                <span class="stat-item"><i class="fas fa-circle" style="color: ${getStatusColor(sprint.status)}"></i> ${getStatusLabel(sprint.status)}</span>
+            </div>
+        </article>
+    `).join('');
+}
 
-        return `
-            <article class="sprint-card" data-sprint-id="${sprint.id}">
-                <div class="sprint-card-header">
-                    <h3>${escapeHtml(sprint.nombre)}</h3>
-                    <div class="sprint-card-actions">
-                        <a href="retrospectiva.html?sprint_id=${sprint.id}" class="btn btn-sm btn-add">
-                            <i class="fas fa-comments"></i> Retrospectiva
-                        </a>
-                        <button class="btn btn-secondary btn-sm" onclick="openSprintModal(${sprint.id})">
-                            <i class="fas fa-edit"></i> Editar
-                        </button>
-                        <button class="btn btn-danger btn-sm" onclick="confirmDeleteSprint(${sprint.id})">
-                            <i class="fas fa-trash"></i> Eliminar
-                        </button>
-                    </div>
-                </div>
-                <div class="sprint-card-dates">
-                    <span><i class="fas fa-play"></i> ${formatDate(sprint.fecha_inicio)}</span>
-                    <span><i class="fas fa-stop"></i> ${formatDate(sprint.fecha_fin)}</span>
-                </div>
-                <div class="sprint-card-stats">
-                    <span class="stat-item"><i class="fas fa-trophy"></i> ${count('logro')} logros</span>
-                    <span class="stat-item"><i class="fas fa-exclamation-triangle"></i> ${count('impedimento')} impedimentos</span>
-                    <span class="stat-item"><i class="fas fa-tasks"></i> ${count('accion')} acciones</span>
-                    <span class="stat-item"><i class="fas fa-sticky-note"></i> ${count('comentario')} comentarios</span>
-                </div>
-            </article>
-        `;
-    }).join('');
+function getStatusColor(status) {
+    const colors = {
+        'planned': 'var(--info)',
+        'active': 'var(--primary)',
+        'completed': 'var(--success)',
+        'cancelled': 'var(--danger)'
+    };
+    return colors[status] || 'var(--gray-500)';
+}
+
+function getStatusLabel(status) {
+    const labels = {
+        'planned': 'Planificado',
+        'active': 'Activo',
+        'completed': 'Completado',
+        'cancelled': 'Cancelado'
+    };
+    return labels[status] || status;
 }
 
 function openSprintModal(id = null) {
@@ -124,12 +123,12 @@ function openSprintModal(id = null) {
 
     if (id) {
         title.innerHTML = '<i class="fas fa-edit"></i> Modificar Sprint';
-        const sprint = currentSprints.find(s => Number(s.id) === Number(id));
+        const sprint = currentSprints.find(s => s.id === id);
         if (sprint) {
             document.getElementById('sprint-id').value = sprint.id;
-            document.getElementById('sprint-name').value = sprint.nombre;
-            document.getElementById('sprint-start').value = sprint.fecha_inicio;
-            document.getElementById('sprint-end').value = sprint.fecha_fin;
+            document.getElementById('sprint-name').value = sprint.name;
+            document.getElementById('sprint-start').value = sprint.start_date;
+            document.getElementById('sprint-end').value = sprint.end_date;
         }
     } else {
         title.innerHTML = '<i class="fas fa-plus"></i> Nuevo Sprint';
@@ -147,23 +146,18 @@ function closeSprintModal() {
 
 async function handleSprintSubmit(e) {
     e.preventDefault();
-
+    
     const id = document.getElementById('sprint-id').value;
     const data = {
-        nombre: document.getElementById('sprint-name').value.trim(),
-        fecha_inicio: document.getElementById('sprint-start').value,
-        fecha_fin: document.getElementById('sprint-end').value
+        name: document.getElementById('sprint-name').value.trim(),
+        start_date: document.getElementById('sprint-start').value,
+        end_date: document.getElementById('sprint-end').value,
+        status: 'planned'
     };
 
-    if (!data.nombre) {
-        showToast('El nombre del sprint es obligatorio', 'error');
-        return;
-    }
-    if (!data.fecha_inicio || !data.fecha_fin) {
-        showToast('Las fechas de inicio y fin son obligatorias', 'error');
-        return;
-    }
-    if (data.fecha_inicio > data.fecha_fin) {
+    const start = data.start_date;
+    const end = data.end_date;
+    if (start && end && start > end) {
         showToast('La fecha de inicio no puede ser posterior a la fecha de fin', 'error');
         return;
     }
@@ -191,11 +185,8 @@ async function handleSprintSubmit(e) {
     }
 }
 
-async function confirmDeleteSprint(id) {
-    const sprint = currentSprints.find(s => Number(s.id) === Number(id));
-    const nombre = sprint ? sprint.nombre : 'este sprint';
-
-    if (!confirm(`¿Está seguro de eliminar el sprint "${nombre}"? Se eliminarán también todos sus items de retrospectiva.`)) {
+async function confirmDeleteSprint(id, name) {
+    if (!confirm(`¿Está seguro de eliminar el sprint "${name}"? Se eliminarán también todos sus items de retrospectiva.`)) {
         return;
     }
 

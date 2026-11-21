@@ -3,89 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprints - Retrospectivas Ágiles</title>
+    <title>Gestión de Sprints</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div class="app-container">
         <header class="header">
             <div class="header-content">
-                <h1><i class="fas fa-calendar-alt" aria-hidden="true"></i> Gestión de Sprints</h1>
+                <h1><i class="fas fa-calendar-alt"></i> Gestión de Sprints</h1>
                 <p class="subtitle">Registro de Retrospectivas Ágiles</p>
             </div>
         </header>
 
-        <nav class="nav-tabs" role="tablist" aria-label="Navegación principal">
-            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('dashboard.html')">
-                <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Dashboard
+        <nav class="nav-tabs" role="tablist">
+            <button class="tab-btn active" role="tab" onclick="location.href='sprints.html'">
+                <i class="fas fa-calendar-alt"></i> Sprints
             </button>
-            <button class="tab-btn active" role="tab" aria-selected="true">
-                <i class="fas fa-calendar-alt" aria-hidden="true"></i> Sprints
+            <button class="tab-btn" role="tab" onclick="location.href='retrospectiva.html'">
+                <i class="fas fa-comments"></i> Ver retrospectiva del sprint
             </button>
-            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('retrospectiva.html')">
-                <i class="fas fa-comments" aria-hidden="true"></i> Retrospectiva
-            </button>
-            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('historial.html')">
-                <i class="fas fa-history" aria-hidden="true"></i> Historial
+            <button class="tab-btn" role="tab" onclick="location.href='historial.html'">
+                <i class="fas fa-history"></i> Historial
             </button>
         </nav>
 
-        <main class="main-content" role="main" id="main-content">
-            <div class="service-status" id="services-status"></div>
-
+        <main class="main-content">
             <div class="panel-header">
-                <h2><i class="fas fa-list" aria-hidden="true"></i> Lista de Sprints</h2>
-                <div class="panel-actions">
-                    <button class="btn btn-primary" onclick="openSprintModal()">
-                        <i class="fas fa-plus" aria-hidden="true"></i> Nuevo Sprint
-                    </button>
-                </div>
+                <h2><i class="fas fa-calendar-alt"></i> Lista de Sprints</h2>
+                <button class="btn btn-primary" onclick="openSprintModal()">
+                    <i class="fas fa-plus"></i> Nuevo Sprint
+                </button>
             </div>
 
-            <div class="sprints-list" id="sprints-list" role="list" aria-label="Lista de sprints"></div>
+            <div class="toast-container" id="toast-container"></div>
+
+            <div class="sprints-list" id="sprints-list"></div>
         </main>
     </div>
 
-    <!-- Sprint Modal -->
+    <!-- Sprint Modal (igual que monolítico sprint_form.php pero en modal) -->
     <div class="modal" id="sprint-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div class="modal-overlay" onclick="closeSprintModal()"></div>
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modal-title"><i class="fas fa-plus" aria-hidden="true"></i> Nuevo Sprint</h3>
+                <h3 id="modal-title"><i class="fas fa-plus"></i> Nuevo Sprint</h3>
                 <button class="modal-close" onclick="closeSprintModal()" aria-label="Cerrar modal">&times;</button>
             </div>
             <form id="sprint-form" novalidate>
-                <input type="hidden" id="sprint-id" name="id">
+                <input type="hidden" name="id" id="sprint-id" value="0">
                 <div class="form-group">
-                    <label for="sprint-name">Nombre del Sprint <span class="required" aria-hidden="true">*</span></label>
-                    <input type="text" id="sprint-name" name="nombre" class="form-control" required 
-                           placeholder="Ej: Sprint 1 - Autenticación de usuarios" maxlength="100" autofocus>
+                    <label for="nombre">Nombre del Sprint <span class="required">*</span></label>
+                    <input type="text" id="nombre" name="nombre" class="form-control" required placeholder="Ej: Sprint 1 - Autenticación">
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="sprint-start">Fecha Inicio <span class="required" aria-hidden="true">*</span></label>
-                        <input type="date" id="sprint-start" name="fecha_inicio" class="form-control" required>
+                        <label for="fecha_inicio">Fecha Inicio <span class="required">*</span></label>
+                        <input type="date" id="fecha_inicio" name="fecha_inicio" class="form-control" required>
                     </div>
                     <div class="form-group">
-                        <label for="sprint-end">Fecha Fin <span class="required" aria-hidden="true">*</span></label>
-                        <input type="date" id="sprint-end" name="fecha_fin" class="form-control" required>
+                        <label for="fecha_fin">Fecha Fin <span class="required">*</span></label>
+                        <input type="date" id="fecha_fin" name="fecha_fin" class="form-control" required>
                     </div>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeSprintModal()">Cancelar</button>
                     <button type="submit" class="btn btn-primary" id="sprint-submit">
-                        <i class="fas fa-save" aria-hidden="true"></i> <span class="btn-text">Guardar Sprint</span>
+                        <i class="fas fa-save"></i> <span class="btn-text">Guardar Sprint</span>
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
-
     <script type="module" src="js/sprints.js"></script>
-    <script>
-        function navigateTo(page) { window.location.href = page; }
-    </script>
 </body>
 </html>

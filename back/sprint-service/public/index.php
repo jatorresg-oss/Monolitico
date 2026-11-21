@@ -8,20 +8,19 @@ require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/../app/global/database_config.php';
 
 $cors = require __DIR__ . '/../app/Middlewares/cors.php';
-$endpoints = require __DIR__ . '/../app/Presentation/Routers/endpoints.php';
+$routes = require __DIR__ . '/../app/Presentation/Routers/routes.php';
 
 $app = AppFactory::create();
 
 $app->addBodyParsingMiddleware();
 $app->addRoutingMiddleware();
 
-$endpoints($app);
+$cors($app);
+
+$routes($app);
 
 $app->get('/health', function (Request $request, Response $response) {
-    $response->getBody()->write(json_encode([
-        'status' => 'ok',
-        'service' => 'sprint-service',
-    ], JSON_UNESCAPED_UNICODE));
+    $response->getBody()->write(json_encode(['status' => 'ok', 'service' => 'sprint-service'], JSON_UNESCAPED_UNICODE));
     return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
 });
 
@@ -39,7 +38,5 @@ $errorMiddleware->setDefaultErrorHandler(function (Request $request, Throwable $
 
     return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
 });
-
-$cors($app);
 
 $app->run();

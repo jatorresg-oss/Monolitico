@@ -2,108 +2,91 @@
 
 namespace App\Controllers;
 
-use App\Models\RetroItem;
-use App\Models\Sprint;
+use App\Models\FeedbackItem;
+use App\Models\Retrospective;
 use Illuminate\Database\Eloquent\Collection;
+use Exception;
 
 class FeedbackController
 {
-    public const CATEGORIAS = ['accion', 'logro', 'impedimento', 'comentario', 'otro'];
-    public const CATEGORIAS_FEEDBACK = ['logro', 'impedimento', 'comentario', 'otro'];
-
-    public function get_feedback_by_sprint(int $sprintId, ?string $categoria = null): Collection
+    function get_by_retrospective(int $retroId): Collection
     {
-        $query = RetroItem::with('sprint')
-            ->where('sprint_id', $sprintId)
-            ->orderBy('created_at');
-
-        if ($categoria !== null) {
-            $query->where('categoria', $categoria);
-        } else {
-            $query->whereIn('categoria', self::CATEGORIAS_FEEDBACK);
-        }
-
-        return $query->get();
-    }
-
-    public function get_all_feedback(): Collection
-    {
-        return RetroItem::with('sprint')
-            ->whereIn('categoria', self::CATEGORIAS_FEEDBACK)
-            ->orderByDesc('created_at')
+        return FeedbackItem::where('retrospective_id', $retroId)
+            ->orderBy('type')
+            ->orderBy('order_index')
             ->get();
     }
 
-    public function get_feedback(int $id): RetroItem
+    function get_by_type(int $retroId, string $type): Collection
     {
-        return RetroItem::with('sprint')->findOrFail($id);
+        return FeedbackItem::where('retrospective_id', $retroId)
+            ->where('type', $type)
+            ->orderBy('order_index')
+            ->get();
     }
 
-    public function get_summary_by_sprint(int $sprintId): array
+    function get_feedback(int $id): FeedbackItem
     {
-        $sprint = Sprint::findOrFail($sprintId);
-
-        $counts = RetroItem::where('sprint_id', $sprintId)
-            ->selectRaw('categoria, COUNT(*) as total')
-            ->groupBy('categoria')
-            ->pluck('total', 'categoria')
-            ->toArray();
-
-        return $this->buildSummary(
-            $counts,
-            $this->actionStats(RetroItem::where('sprint_id', $sprintId)->where('categoria', 'accion')),
-            [
-                'sprint_id' => (int) $sprint->id,
-                'sprint_nombre' => $sprint->nombre,
-                'fecha_inicio' => $sprint->fecha_inicio?->format('Y-m-d'),
-                'fecha_fin' => $sprint->fecha_fin?->format('Y-m-d'),
-            ]
-        );
+        return FeedbackItem::findOrFail($id);
     }
 
-    public function get_global_summary(): array
+    function create(array $data): FeedbackItem
     {
-        $counts = RetroItem::selectRaw('categoria, COUNT(*) as total')
-            ->groupBy('categoria')
-            ->pluck('total', 'categoria')
-            ->toArray();
-
-        return $this->buildSummary(
-            $counts,
-            $this->actionStats(RetroItem::where('categoria', 'accion')),
-            ['sprints' => Sprint::count()]
-        );
+        Retrospective::findOrFail($data['retrospective_id']);
+        
+        $feedback = new FeedbackItem();
+        $feedback->retrospective_id = $data['retrospective_id'];
+        $feedback->type = $data['type'];
+        $feedback->title = $data['title'];
+        $feedback->description = $data['description'] ?? null;
+        $feedback->priority = $data['priority'] ?? 'medium';
+        $feedback->assignee = $data['assignee'] ?? null;
+        $feedback->due_date = $data['due_date'] ?? null;
+        $feedback->order_index = $data['order_index'] ?? 0;
+        $feedback->save();
+        return $feedback;
     }
 
-    private function buildSummary(array $counts, array $actions, array $extra = []): array
+    function create_bulk(array $data): array
     {
-        $porCategoria = [];
-        foreach (self::CATEGORIAS as $categoria) {
-            $porCategoria[$categoria] = (int) ($counts[$categoria] ?? 0);
+        Retrospective::findOrFail($data['retrospective_id']);
+        
+        $items = [];
+        foreach ($data['items'] as $itemData) {
+            $feedback = new FeedbackItem();
+            $feedback->retrospective_id = $data['retrospective_id'];
+            $feedback->type = $itemData['type'];
+            $feedback->title = $itemData['title'];
+            $feedback->description = $itemData['description'] ?? null;
+            $feedback->priority = $itemData['priority'] ?? 'medium';
+            $feedback->assignee = $itemData['assignee'] ?? null;
+            $feedback->due_date = $itemData['due_date'] ?? null;
+            $feedback->order_index = $itemData['order_index'] ?? 0;
+            $feedback->save();
+            $items[] = $feedback;
         }
-
-        return array_merge($extra, [
-            'total_items' => array_sum($porCategoria),
-            'por_categoria' => $porCategoria,
-            'acciones' => $actions,
-        ]);
+        return $items;
     }
 
-    private function actionStats($query): array
+    function update(int $id, array $data): FeedbackItem
     {
-        $total = (clone $query)->count();
-        $cumplidas = (clone $query)->where('cumplida', 1)->count();
-        $pendientes = (clone $query)
-            ->where(function ($q) {
-                $q->whereNull('cumplida')->orWhere('cumplida', 0);
-            })
-            ->count();
+        $feedback = FeedbackItem::findOrFail($id);
+        
+        if (isset($data['title'])) $feedback->title = $data['title'];
+        if (isset($data['description'])) $feedback->description = $data['description'];
+        if (isset($data['priority'])) $feedback->priority = $data['priority'];
+        if (isset($data['assignee'])) $feedback->assignee = $data['assignee'];
+        if (isset($data['due_date'])) $feedback->due_date = $data['due_date'];
+        if (isset($data['order_index'])) $feedback->order_index = $data['order_index'];
+        
+        $feedback->save();
+        return $feedback;
+    }
 
-        return [
-            'total' => $total,
-            'cumplidas' => $cumplidas,
-            'pendientes' => $pendientes,
-            'tasa_cumplimiento' => $total > 0 ? round(($cumplidas / $total) * 100, 1) : 0,
-        ];
+    function delete(int $id): FeedbackItem
+    {
+        $feedback = FeedbackItem::findOrFail($id);
+        $feedback->delete();
+        return $feedback;
     }
 }

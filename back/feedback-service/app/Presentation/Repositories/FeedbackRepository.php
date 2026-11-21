@@ -3,104 +3,143 @@
 namespace App\Presentation\Repositories;
 
 use App\Controllers\FeedbackController;
-use App\Models\Sprint;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use Throwable;
+use Exception;
 
 class FeedbackRepository
 {
-    public function all(Request $request, Response $response, $args): Response
+    public function getByRetrospective(Request $request, Response $response, $args): Response
     {
         try {
+            $retroId = $args['retroId'];
             $controller = new FeedbackController();
-            return $this->json($response, $controller->get_all_feedback());
-        } catch (Throwable $ex) {
-            return $this->error($response, $ex->getMessage(), 500);
+            $rows = $controller->get_by_retrospective($retroId);
+            $response->getBody()->write($rows->toJson());
+            return $response->withHeader("Content-Type", "application/json");
+        } catch (Exception $ex) {
+            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
+            return $response->withStatus(500)->withHeader("Content-Type", "application/json");
         }
     }
 
-    public function bySprint(Request $request, Response $response, $args): Response
+    public function getByType(Request $request, Response $response, $args): Response
     {
         try {
-            $sprintId = (int) $args['sprintId'];
-            $this->ensureSprint($sprintId);
-            $controller = new FeedbackController();
-            return $this->json($response, $controller->get_feedback_by_sprint($sprintId));
-        } catch (ModelNotFoundException $ex) {
-            return $this->error($response, 'Sprint no encontrado', 404);
-        } catch (Throwable $ex) {
-            return $this->error($response, $ex->getMessage(), 500);
-        }
-    }
-
-    public function bySprintAndType(Request $request, Response $response, $args): Response
-    {
-        try {
-            $categoria = $args['categoria'] ?? null;
-            if (!in_array($categoria, FeedbackController::CATEGORIAS, true)) {
-                return $this->error($response, 'Categoría no válida.', 422);
+            $retroId = $args['retroId'];
+            $type = $args['type'];
+            
+            if (!in_array($type, ['positive', 'negative', 'action', 'comment'])) {
+                $response->getBody()->write(json_encode(['error' => 'Tipo inválido. Use: positive, negative, action, comment']));
+                return $response->withStatus(400)->withHeader("Content-Type", "application/json");
             }
-
-            $sprintId = (int) $args['sprintId'];
-            $this->ensureSprint($sprintId);
+            
             $controller = new FeedbackController();
-            return $this->json($response, $controller->get_feedback_by_sprint($sprintId, $categoria));
-        } catch (ModelNotFoundException $ex) {
-            return $this->error($response, 'Sprint no encontrado', 404);
-        } catch (Throwable $ex) {
-            return $this->error($response, $ex->getMessage(), 500);
-        }
-    }
-
-    public function summary(Request $request, Response $response, $args): Response
-    {
-        try {
-            $controller = new FeedbackController();
-            return $this->json($response, $controller->get_summary_by_sprint((int) $args['sprintId']));
-        } catch (ModelNotFoundException $ex) {
-            return $this->error($response, 'Sprint no encontrado', 404);
-        } catch (Throwable $ex) {
-            return $this->error($response, $ex->getMessage(), 500);
-        }
-    }
-
-    public function stats(Request $request, Response $response, $args): Response
-    {
-        try {
-            $controller = new FeedbackController();
-            return $this->json($response, $controller->get_global_summary());
-        } catch (Throwable $ex) {
-            return $this->error($response, $ex->getMessage(), 500);
+            $rows = $controller->get_by_type($retroId, $type);
+            $response->getBody()->write($rows->toJson());
+            return $response->withHeader("Content-Type", "application/json");
+        } catch (Exception $ex) {
+            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
+            return $response->withStatus(500)->withHeader("Content-Type", "application/json");
         }
     }
 
     public function get(Request $request, Response $response, $args): Response
     {
         try {
+            $id = $args['id'];
             $controller = new FeedbackController();
-            return $this->json($response, $controller->get_feedback((int) $args['id']));
-        } catch (ModelNotFoundException $ex) {
-            return $this->error($response, 'Feedback no encontrado', 404);
-        } catch (Throwable $ex) {
-            return $this->error($response, $ex->getMessage(), 500);
+            $row = $controller->get_feedback($id);
+            $response->getBody()->write($row->toJson());
+            return $response->withHeader("Content-Type", "application/json");
+        } catch (Exception $ex) {
+            $response->getBody()->write(json_encode(['error' => 'Ítem no encontrado']));
+            return $response->withStatus(404)->withHeader("Content-Type", "application/json");
         }
     }
 
-    private function ensureSprint(int $sprintId): void
+    public function create(Request $request, Response $response, $args): Response
     {
-        Sprint::findOrFail($sprintId);
+        try {
+            $body = $request->getBody()->getContents();
+            $data = json_decode($body, true);
+            
+            if (empty($data['retrospective_id']) || empty($data['type']) || empty($data['title'])) {
+                $response->getBody()->write(json_encode(['error' => 'Faltan campos obligatorios: retrospective_id, type, title']));
+                return $response->withStatus(400)->withHeader("Content-Type", "application/json");
+            }
+            
+            if (!in_array($data['type'], ['positive', 'negative', 'action', 'comment'])) {
+                $response->getBody()->write(json_encode(['error' => 'Tipo inválido. Use: positive, negative, action, comment']));
+                return $response->withStatus(400)->withHeader("Content-Type", "application/json");
+            }
+            
+            $controller = new FeedbackController();
+            $row = $controller->create($data);
+            $response->getBody()->write($row->toJson());
+            return $response->withStatus(201)->withHeader("Content-Type", "application/json");
+        } catch (Exception $ex) {
+            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
+            return $response->withStatus(400)->withHeader("Content-Type", "application/json");
+        }
     }
 
-    private function json(Response $response, $data, int $status = 200): Response
+    public function createBulk(Request $request, Response $response, $args): Response
     {
-        $response->getBody()->write(json_encode($data, JSON_UNESCAPED_UNICODE));
-        return $response->withStatus($status)->withHeader('Content-Type', 'application/json; charset=utf-8');
+        try {
+            $body = $request->getBody()->getContents();
+            $data = json_decode($body, true);
+            
+            if (empty($data['retrospective_id']) || empty($data['items']) || !is_array($data['items'])) {
+                $response->getBody()->write(json_encode(['error' => 'Faltan campos obligatorios: retrospective_id, items (array)']));
+                return $response->withStatus(400)->withHeader("Content-Type", "application/json");
+            }
+            
+            foreach ($data['items'] as $item) {
+                if (empty($item['type']) || empty($item['title']) || !in_array($item['type'], ['positive', 'negative', 'action', 'comment'])) {
+                    $response->getBody()->write(json_encode(['error' => 'Cada item debe tener type (positive/negative/action/comment) y title']));
+                    return $response->withStatus(400)->withHeader("Content-Type", "application/json");
+                }
+            }
+            
+            $controller = new FeedbackController();
+            $rows = $controller->create_bulk($data);
+            $response->getBody()->write(json_encode($rows));
+            return $response->withStatus(201)->withHeader("Content-Type", "application/json");
+        } catch (Exception $ex) {
+            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
+            return $response->withStatus(400)->withHeader("Content-Type", "application/json");
+        }
     }
 
-    private function error(Response $response, string $message, int $status): Response
+    public function update(Request $request, Response $response, $args): Response
     {
-        return $this->json($response, ['error' => $message], $status);
+        try {
+            $id = $args['id'];
+            $body = $request->getBody()->getContents();
+            $data = json_decode($body, true);
+            
+            $controller = new FeedbackController();
+            $row = $controller->update($id, $data);
+            $response->getBody()->write($row->toJson());
+            return $response->withHeader("Content-Type", "application/json");
+        } catch (Exception $ex) {
+            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
+            return $response->withStatus(404)->withHeader("Content-Type", "application/json");
+        }
+    }
+
+    public function delete(Request $request, Response $response, $args): Response
+    {
+        try {
+            $id = $args['id'];
+            $controller = new FeedbackController();
+            $row = $controller->delete($id);
+            $response->getBody()->write($row->toJson());
+            return $response->withHeader("Content-Type", "application/json");
+        } catch (Exception $ex) {
+            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
+            return $response->withStatus(404)->withHeader("Content-Type", "application/json");
+        }
     }
 }

@@ -4,8 +4,7 @@
 
 import {
     getSprints,
-    getAllItems,
-    getFeedbackStats,
+    getRetrospectives,
     checkAllServices,
     formatDate,
     escapeHtml,
@@ -13,7 +12,6 @@ import {
 } from './api.js';
 
 let currentSprints = [];
-let allItems = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
@@ -30,8 +28,8 @@ async function checkServicesStatus() {
         <div class="service-badge ${status.sprints ? 'online' : 'offline'}">
             <i class="fas fa-calendar-alt"></i> Sprint Service ${status.sprints ? '●' : '○'}
         </div>
-        <div class="service-badge ${status.retrospective ? 'online' : 'offline'}">
-            <i class="fas fa-comments"></i> Retrospective Service ${status.retrospective ? '●' : '○'}
+        <div class="service-badge ${status.retrospectives ? 'online' : 'offline'}">
+            <i class="fas fa-comments"></i> Retrospective Service ${status.retrospectives ? '●' : '○'}
         </div>
         <div class="service-badge ${status.feedback ? 'online' : 'offline'}">
             <i class="fas fa-list"></i> Feedback Service ${status.feedback ? '●' : '○'}
@@ -45,16 +43,14 @@ async function checkServicesStatus() {
 async function loadDashboard() {
     showLoading(true);
     try {
-        const [sprints, items, stats] = await Promise.all([
+        const [sprints, retrospectives] = await Promise.all([
             getSprints(),
-            getAllItems(),
-            getFeedbackStats()
+            getRetrospectives()
         ]);
 
         currentSprints = sprints || [];
-        allItems = items || [];
 
-        renderStats(stats);
+        renderStats(retrospectives);
         renderRecentSprints();
     } catch (error) {
         console.error('Error loading dashboard:', error);
@@ -64,12 +60,12 @@ async function loadDashboard() {
     }
 }
 
-function renderStats(stats) {
+function renderStats(retrospectives) {
     const container = document.getElementById('stats-container');
     if (!container) return;
 
-    const acciones = stats?.acciones || { total: 0, cumplidas: 0, pendientes: 0, tasa_cumplimiento: 0 };
-    const totalItems = stats?.total_items ?? allItems.length;
+    const totalRetrospectives = retrospectives.length;
+    const completedRetrospectives = retrospectives.filter(r => r.status === 'completed').length;
 
     container.innerHTML = `
         <article class="stat-card">
@@ -82,22 +78,22 @@ function renderStats(stats) {
         <article class="stat-card">
             <div class="stat-icon retrospectives"><i class="fas fa-comments"></i></div>
             <div class="stat-info">
-                <h3>Items Registrados</h3>
-                <div class="stat-value">${totalItems}</div>
-            </div>
-        </article>
-        <article class="stat-card">
-            <div class="stat-icon actions"><i class="fas fa-tasks"></i></div>
-            <div class="stat-info">
-                <h3>Acciones Pendientes</h3>
-                <div class="stat-value">${acciones.pendientes}</div>
+                <h3>Retrospectivas</h3>
+                <div class="stat-value">${totalRetrospectives}</div>
             </div>
         </article>
         <article class="stat-card">
             <div class="stat-icon completion"><i class="fas fa-check-circle"></i></div>
             <div class="stat-info">
-                <h3>Tasa de Cumplimiento</h3>
-                <div class="stat-value">${acciones.tasa_cumplimiento ?? 0}%</div>
+                <h3>Retrospectivas Completadas</h3>
+                <div class="stat-value">${completedRetrospectives}</div>
+            </div>
+        </article>
+        <article class="stat-card">
+            <div class="stat-icon completion"><i class="fas fa-percentage"></i></div>
+            <div class="stat-info">
+                <h3>Tasa Completitud</h3>
+                <div class="stat-value">${currentSprints.length > 0 ? Math.round((completedRetrospectives / currentSprints.length) * 100) : 0}%</div>
             </div>
         </article>
     `;
@@ -121,32 +117,45 @@ function renderRecentSprints() {
         return;
     }
 
-    container.innerHTML = recentSprints.map(sprint => {
-        const items = allItems.filter(item => Number(item.sprint_id) === Number(sprint.id));
-        const acciones = items.filter(item => item.categoria === 'accion');
-        const pendientes = acciones.filter(item => !item.cumplida).length;
+    container.innerHTML = recentSprints.map(sprint => `
+        <article class="sprint-card" data-sprint-id="${sprint.id}">
+            <div class="sprint-card-header">
+                <h3>${escapeHtml(sprint.name)}</h3>
+                <div class="sprint-card-actions">
+                    <a href="retrospectiva.html?sprint_id=${sprint.id}" class="btn btn-sm btn-add">
+                        <i class="fas fa-comments"></i> Retrospectiva
+                    </a>
+                </div>
+            </div>
+            <div class="sprint-card-dates">
+                <span><i class="fas fa-play"></i> ${formatDate(sprint.start_date)}</span>
+                <span><i class="fas fa-stop"></i> ${formatDate(sprint.end_date)}</span>
+            </div>
+            <div class="sprint-card-stats">
+                <span class="stat-item"><i class="fas fa-circle" style="color: ${getStatusColor(sprint.status)}"></i> ${getStatusLabel(sprint.status)}</span>
+            </div>
+        </article>
+    `).join('');
+}
 
-        return `
-            <article class="sprint-card" data-sprint-id="${sprint.id}">
-                <div class="sprint-card-header">
-                    <h3>${escapeHtml(sprint.nombre)}</h3>
-                    <div class="sprint-card-actions">
-                        <a href="retrospectiva.html?sprint_id=${sprint.id}" class="btn btn-sm btn-add">
-                            <i class="fas fa-comments"></i> Retrospectiva
-                        </a>
-                    </div>
-                </div>
-                <div class="sprint-card-dates">
-                    <span><i class="fas fa-play"></i> ${formatDate(sprint.fecha_inicio)}</span>
-                    <span><i class="fas fa-stop"></i> ${formatDate(sprint.fecha_fin)}</span>
-                </div>
-                <div class="sprint-card-stats">
-                    <span class="stat-item"><i class="fas fa-layer-group"></i> ${items.length} items</span>
-                    <span class="stat-item"><i class="fas fa-tasks"></i> ${acciones.length} acciones (${pendientes} pendientes)</span>
-                </div>
-            </article>
-        `;
-    }).join('');
+function getStatusColor(status) {
+    const colors = {
+        'planned': 'var(--info)',
+        'active': 'var(--primary)',
+        'completed': 'var(--success)',
+        'cancelled': 'var(--danger)'
+    };
+    return colors[status] || 'var(--gray-500)';
+}
+
+function getStatusLabel(status) {
+    const labels = {
+        'planned': 'Planificado',
+        'active': 'Activo',
+        'completed': 'Completado',
+        'cancelled': 'Cancelado'
+    };
+    return labels[status] || status;
 }
 
 function showLoading(show) {

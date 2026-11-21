@@ -7,7 +7,7 @@ const API_HOST = window.location.hostname || '127.0.0.1';
 
 const API_BASE = {
     sprints: `http://${API_HOST}:3001`,
-    retrospective: `http://${API_HOST}:3002`,
+    retrospectives: `http://${API_HOST}:3002`,
     feedback: `http://${API_HOST}:3003`,
     actionTracking: `http://${API_HOST}:3004`
 };
@@ -73,7 +73,7 @@ class ApiClient {
 }
 
 export const sprintsApi = new ApiClient(API_BASE.sprints);
-export const retrospectiveApi = new ApiClient(API_BASE.retrospective);
+export const retrospectivesApi = new ApiClient(API_BASE.retrospectives);
 export const feedbackApi = new ApiClient(API_BASE.feedback);
 export const actionTrackingApi = new ApiClient(API_BASE.actionTracking);
 
@@ -101,77 +101,97 @@ export async function deleteSprint(id) {
 }
 
 // ============================================================
-// Retrospective Service (puerto 3002) - items de retrospectiva
+// Retrospective Service (puerto 3002) - retrospectivas
 // ============================================================
-export async function getAllItems() {
-    return (await retrospectiveApi.get('/retro-items')) || [];
+export async function getRetrospectives() {
+    return (await retrospectivesApi.get('/retrospectives')) || [];
 }
 
-export async function getItemsBySprint(sprintId) {
-    return (await retrospectiveApi.get(`/retro-items/sprint/${sprintId}`)) || [];
+export async function getRetrospectiveBySprint(sprintId) {
+    try {
+        return await retrospectivesApi.get(`/retrospectives/sprint/${sprintId}`);
+    } catch (e) {
+        if (e.message.includes('404')) return null;
+        throw e;
+    }
 }
 
-export async function getItemsByCategory(sprintId, categoria) {
-    return (await retrospectiveApi.get(`/retro-items/sprint/${sprintId}/categoria/${categoria}`)) || [];
+export async function getRetrospective(id) {
+    return await retrospectivesApi.get(`/retrospectives/${id}`);
 }
 
-export async function getItem(id) {
-    return await retrospectiveApi.get(`/retro-items/${id}`);
+export async function createRetrospective(data) {
+    return await retrospectivesApi.post('/retrospectives', data);
 }
 
-export async function createItem(data) {
-    return await retrospectiveApi.post('/retro-items', data);
+export async function updateRetrospective(id, data) {
+    return await retrospectivesApi.put(`/retrospectives/${id}`, data);
 }
 
-export async function updateItem(id, data) {
-    return await retrospectiveApi.put(`/retro-items/${id}`, data);
+export async function completeRetrospective(id) {
+    return await retrospectivesApi.put(`/retrospectives/${id}/complete`);
 }
 
-export async function deleteItem(id) {
-    return await retrospectiveApi.delete(`/retro-items/${id}`);
+export async function deleteRetrospective(id) {
+    return await retrospectivesApi.delete(`/retrospectives/${id}`);
 }
 
 // ============================================================
-// Feedback Service (puerto 3003) - consultas y resúmenes
+// Feedback Service (puerto 3003) - items de retrospectiva
 // ============================================================
-export async function getFeedbackBySprint(sprintId) {
-    return (await feedbackApi.get(`/feedbacks/sprint/${sprintId}`)) || [];
+export async function getFeedbackByRetrospective(retroId) {
+    return (await feedbackApi.get(`/feedbacks/retrospective/${retroId}`)) || [];
 }
 
-export async function getFeedbackByType(sprintId, categoria) {
-    return (await feedbackApi.get(`/feedbacks/sprint/${sprintId}/type/${categoria}`)) || [];
+export async function getFeedbackByType(retroId, type) {
+    return (await feedbackApi.get(`/feedbacks/retrospective/${retroId}/type/${type}`)) || [];
 }
 
-export async function getFeedbackSummary(sprintId) {
-    return await feedbackApi.get(`/feedbacks/summary/${sprintId}`);
+export async function getFeedback(id) {
+    return await feedbackApi.get(`/feedbacks/${id}`);
 }
 
-export async function getFeedbackStats() {
-    return await feedbackApi.get('/feedbacks/stats');
+export async function createFeedback(data) {
+    return await feedbackApi.post('/feedbacks', data);
+}
+
+export async function createFeedbackBulk(data) {
+    return await feedbackApi.post('/feedbacks/bulk', data);
+}
+
+export async function updateFeedback(id, data) {
+    return await feedbackApi.put(`/feedbacks/${id}`, data);
+}
+
+export async function deleteFeedback(id) {
+    return await feedbackApi.delete(`/feedbacks/${id}`);
 }
 
 // ============================================================
 // Action Tracking Service (puerto 3004) - seguimiento de acciones
 // ============================================================
-export async function getActionsBySprint(sprintId) {
-    return (await actionTrackingApi.get(`/action-tracking/sprint/${sprintId}`)) || [];
-}
-
 export async function getPendingActions(sprintId) {
     return (await actionTrackingApi.get(`/action-tracking/pending/${sprintId}`)) || [];
 }
 
-export async function getAction(id) {
-    return await actionTrackingApi.get(`/action-tracking/${id}`);
+export async function getActionTrackingBySprint(sprintId) {
+    return (await actionTrackingApi.get(`/action-tracking/sprint/${sprintId}`)) || [];
 }
 
-export async function updateAction(id, data) {
-    return await actionTrackingApi.patch(`/action-tracking/${id}`, data);
+export async function getActionTrackingHistory(feedbackId) {
+    return (await actionTrackingApi.get(`/action-tracking/history/${feedbackId}`)) || [];
 }
 
-export async function getActionStats(sprintId = null) {
-    const endpoint = sprintId ? `/action-tracking/stats/${sprintId}` : '/action-tracking/stats';
-    return await actionTrackingApi.get(endpoint);
+export async function createActionTracking(data) {
+    return await actionTrackingApi.post('/action-tracking', data);
+}
+
+export async function updateActionTracking(id, data) {
+    return await actionTrackingApi.put(`/action-tracking/${id}`, data);
+}
+
+export async function deleteActionTracking(id) {
+    return await actionTrackingApi.delete(`/action-tracking/${id}`);
 }
 
 // ============================================================
@@ -180,14 +200,14 @@ export async function getActionStats(sprintId = null) {
 export async function checkAllServices() {
     const results = await Promise.allSettled([
         sprintsApi.healthCheck(),
-        retrospectiveApi.healthCheck(),
+        retrospectivesApi.healthCheck(),
         feedbackApi.healthCheck(),
         actionTrackingApi.healthCheck()
     ]);
 
     return {
         sprints: results[0].status === 'fulfilled' && results[0].value,
-        retrospective: results[1].status === 'fulfilled' && results[1].value,
+        retrospectives: results[1].status === 'fulfilled' && results[1].value,
         feedback: results[2].status === 'fulfilled' && results[2].value,
         actionTracking: results[3].status === 'fulfilled' && results[3].value
     };
@@ -243,37 +263,4 @@ export function getCategoryColor(categoria) {
 
 export function isCompleted(item) {
     return item.cumplida === true || item.cumplida === 1 || item.cumplida === '1';
-}
-
-export function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text ?? '';
-    return div.innerHTML;
-}
-
-export function showToast(message, type = 'info') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    const icons = {
-        success: 'fa-check-circle',
-        error: 'fa-exclamation-circle',
-        warning: 'fa-exclamation-triangle',
-        info: 'fa-info-circle'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.setAttribute('role', 'alert');
-    toast.setAttribute('aria-live', 'polite');
-    toast.innerHTML = `
-        <i class="fas ${icons[type] || icons.info} toast-icon" aria-hidden="true"></i>
-        <span class="toast-message">${escapeHtml(message)}</span>
-        <button class="toast-close" aria-label="Cerrar notificación">&times;</button>
-    `;
-
-    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
-    container.appendChild(toast);
-
-    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
 }

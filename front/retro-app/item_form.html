@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Item Form - Retrospectivas Ágiles</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body>
     <div class="app-container">
@@ -39,21 +40,21 @@
             <div style="max-width: 600px;">
                 <form id="item-form" novalidate>
                     <input type="hidden" id="item-id" name="id">
-                    <input type="hidden" id="item-sprint-id" name="sprint_id">
+                    <input type="hidden" id="item-retro-id" name="retrospective_id">
                     <input type="hidden" id="item-categoria" name="categoria">
-
+                    
                     <!-- Category indicator -->
                     <div id="category-badge" class="category-badge logro" style="margin-bottom: 20px; justify-content: center; font-size: 0.875rem;">
                         <i class="fas fa-trophy" aria-hidden="true"></i> Logro
                     </div>
-
+                    
                     <div class="form-group">
                         <label for="descripcion">Descripción <span class="required" aria-hidden="true">*</span></label>
                         <textarea id="descripcion" name="descripcion" class="form-control" required rows="5"
                                   placeholder="Describa el punto a tratar..." autofocus></textarea>
                         <p class="help-text">Escribe una descripción clara y concisa</p>
                     </div>
-
+                    
                     <!-- Action-specific fields -->
                     <div id="action-fields" style="display: none;">
                         <div class="form-group">
@@ -64,7 +65,7 @@
                             </label>
                             <p class="help-text">Marca si esta acción ya se completó</p>
                         </div>
-
+                        
                         <div class="form-group">
                             <label for="fecha_revision">Fecha de revisión</label>
                             <input type="date" id="fecha_revision" name="fecha_revision" class="form-control">
@@ -86,41 +87,42 @@
     <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
     <script>
-        const API_RETRO = 'http://127.0.0.1:3002';
-        const API_SPRINTS = 'http://127.0.0.1:3001';
-
-        let currentSprintId = null;
-        let currentCategoria = 'logro';
+        let currentRetrospectiveId = null;
+        let currentCategoria = 'positive';
         let currentItemId = null;
 
         const labels = {
-            logro: 'Logro',
-            impedimento: 'Impedimento',
-            accion: 'Acción',
-            comentario: 'Comentario',
-            otro: 'Otro'
+            'positive': 'Logro',
+            'negative': 'Impedimento',
+            'action': 'Acción',
+            'comment': 'Comentario'
         };
 
         const icons = {
-            logro: 'trophy',
-            impedimento: 'exclamation-triangle',
-            accion: 'tasks',
-            comentario: 'sticky-note',
-            otro: 'circle'
+            'positive': 'trophy',
+            'negative': 'exclamation-triangle',
+            'action': 'tasks',
+            'comment': 'sticky-note'
         };
 
         const colors = {
-            logro: 'var(--success)',
-            impedimento: 'var(--danger)',
-            accion: 'var(--primary)',
-            comentario: 'var(--info)',
-            otro: 'var(--gray-600)'
+            'positive': 'var(--success)',
+            'negative': 'var(--danger)',
+            'action': 'var(--primary)',
+            'comment': 'var(--info)'
+        };
+
+        // Mapear categoría UI a tipo API
+        const typeMap = {
+            'logro': 'positive',
+            'impedimento': 'negative',
+            'accion': 'action',
+            'comentario': 'comment'
         };
 
         document.addEventListener('DOMContentLoaded', async () => {
             parseURLParams();
             updateUI();
-            await loadSprintInfo();
             setupForm();
 
             // Load item if editing from URL parameter
@@ -131,11 +133,12 @@
             const params = new URLSearchParams(window.location.search);
             currentCategoria = params.get('categoria') || 'logro';
             if (!labels[currentCategoria]) currentCategoria = 'logro';
-            currentSprintId = params.get('sprint_id') ? parseInt(params.get('sprint_id')) : null;
+            currentRetrospectiveId = params.get('retro_id') ? parseInt(params.get('retro_id')) : null;
             currentItemId = params.get('id') ? parseInt(params.get('id')) : null;
         }
 
         function updateUI() {
+            // Update category badge
             const badge = document.getElementById('category-badge');
             if (badge) {
                 badge.className = `category-badge ${currentCategoria}`;
@@ -143,11 +146,13 @@
                 badge.style.borderLeftColor = colors[currentCategoria];
             }
 
+            // Show/hide action fields
             const actionFields = document.getElementById('action-fields');
             if (actionFields) {
                 actionFields.style.display = currentCategoria === 'accion' ? 'block' : 'none';
             }
 
+            // Update page title
             const isEdit = currentItemId !== null;
             document.getElementById('page-title').innerHTML =
                 `<i class="fas fa-${isEdit ? 'edit' : 'plus'}" aria-hidden="true"></i> ${isEdit ? 'Modificar' : 'Agregar'} Item - ${labels[currentCategoria]}`;
@@ -156,29 +161,17 @@
             document.getElementById('submit-btn').innerHTML =
                 `<i class="fas fa-save" aria-hidden="true"></i> ${isEdit ? 'Modificar' : 'Guardar'}`;
 
+            // Update cancel button
             const cancelBtn = document.getElementById('cancel-btn');
+            const retroId = currentRetrospectiveId;
             if (cancelBtn) {
-                cancelBtn.href = currentSprintId
-                    ? `retrospectiva.html?sprint_id=${currentSprintId}`
+                cancelBtn.href = retroId
+                    ? `retrospectiva.html?sprint_id=${retroId}`
                     : 'retrospectiva.html';
             }
         }
 
-        async function loadSprintInfo() {
-            if (!currentSprintId) return;
-
-            try {
-                const response = await fetch(`${API_SPRINTS}/sprints/${currentSprintId}`);
-                if (response.ok) {
-                    const sprint = await response.json();
-                    document.getElementById('page-subtitle').textContent = `Sprint: ${sprint.nombre}`;
-                }
-            } catch (e) {
-                console.error('Error loading sprint:', e);
-            }
-        }
-
-        function setupForm() {
+        async function setupForm() {
             const form = document.getElementById('item-form');
 
             form.addEventListener('submit', async (e) => {
@@ -190,21 +183,24 @@
                     document.getElementById('descripcion').focus();
                     return;
                 }
-                if (!currentSprintId) {
-                    showToast('No se indicó el sprint. Vuelva a la retrospectiva.', 'error');
+                if (!currentRetrospectiveId) {
+                    showToast('No se indicó la retrospectiva. Vuelva a la retrospectiva.', 'error');
                     return;
                 }
 
                 const data = {
-                    sprint_id: currentSprintId,
-                    categoria: currentCategoria,
-                    descripcion
+                    retrospective_id: currentRetrospectiveId,
+                    type: typeMap[currentCategoria],
+                    title: descripcion,
+                    description: descripcion,
+                    priority: 'medium',
+                    order_index: 0
                 };
 
                 if (currentCategoria === 'accion') {
                     data.cumplida = document.getElementById('cumplida').checked;
                     const fecha = document.getElementById('fecha_revision').value;
-                    data.fecha_revision = fecha || null;
+                    data.due_date = fecha || null;
                 }
 
                 const submitBtn = document.getElementById('submit-btn');
@@ -212,22 +208,24 @@
                 submitBtn.disabled = true;
 
                 try {
-                    const url = currentItemId ? `${API_RETRO}/retro-items/${currentItemId}` : `${API_RETRO}/retro-items`;
-                    const method = currentItemId ? 'PUT' : 'POST';
-
-                    const response = await fetch(url, {
-                        method,
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-
-                    if (!response.ok) {
-                        const error = await response.json().catch(() => ({}));
-                        throw new Error(error.error || 'Error al guardar el item');
+                    let result;
+                    if (currentItemId) {
+                        result = await updateFeedback(currentItemId, data);
+                        showToast('Item actualizado correctamente', 'success');
+                    } else {
+                        result = await createFeedback(data);
+                        showToast('Item creado correctamente', 'success');
                     }
-
-                    showToast(currentItemId ? 'Item actualizado correctamente' : 'Item creado correctamente', 'success');
-                    window.location.href = `retrospectiva.html?sprint_id=${currentSprintId}`;
+                    
+                    // Get the retrospective to redirect back
+                    // We need the sprint_id for redirect
+                    const response = await fetch(`http://localhost:3002/retrospectives/${currentRetrospectiveId}`);
+                    if (response.ok) {
+                        const retro = await response.json();
+                        window.location.href = `retrospectiva.html?sprint_id=${retro.sprint_id}`;
+                    } else {
+                        window.location.href = 'retrospectiva.html';
+                    }
                 } catch (error) {
                     console.error('Error saving item:', error);
                     showToast(error.message || 'Error al guardar el item', 'error');
@@ -237,6 +235,7 @@
                 }
             });
 
+            // Auto-resize textarea
             const textarea = document.getElementById('descripcion');
             textarea.addEventListener('input', function () {
                 this.style.height = 'auto';
@@ -246,28 +245,31 @@
 
         async function loadItem(id) {
             try {
-                const response = await fetch(`${API_RETRO}/retro-items/${id}`);
+                const response = await fetch(`http://localhost:3003/feedbacks/${id}`);
                 if (!response.ok) throw new Error('No se pudo cargar el item');
 
                 const item = await response.json();
-                document.getElementById('descripcion').value = item.descripcion || '';
-                currentCategoria = labels[item.categoria] ? item.categoria : 'otro';
-                currentSprintId = item.sprint_id || currentSprintId;
-
+                document.getElementById('descripcion').value = item.description || item.title;
+                
+                // Map API type to UI category
+                currentCategoria = item.type === 'positive' ? 'logro' : 
+                                  item.type === 'negative' ? 'impedimento' : 
+                                  item.type === 'action' ? 'accion' : 'comentario';
+                currentRetrospectiveId = item.retrospective_id;
+                
                 if (currentCategoria === 'accion') {
                     document.getElementById('cumplida').checked = item.cumplida === true || item.cumplida === 1;
-                    document.getElementById('fecha_revision').value = item.fecha_revision || '';
+                    document.getElementById('fecha_revision').value = item.due_date || '';
                 }
-
+                
                 updateUI();
-                await loadSprintInfo();
             } catch (e) {
                 console.error('Error loading item:', e);
                 showToast('Error al cargar el item', 'error');
             }
         }
 
-        // API functions (inline since ES modules don't work with file://)
+        // API functions
         async function createFeedback(data) {
             const response = await fetch('http://localhost:3003/feedbacks', {
                 method: 'POST',
@@ -287,6 +289,14 @@
             if (!response.ok) throw new Error('Error al actualizar');
             return response.json();
         }
+
+        async function getFeedback(id) {
+            const response = await fetch(`http://localhost:3003/feedbacks/${id}`);
+            if (!response.ok) throw new Error('No se pudo cargar el item');
+            return response.json();
+        }
+
+        function navigateTo(page) { window.location.href = page; }
 
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -320,8 +330,6 @@
 
             setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
         }
-
-        function navigateTo(page) { window.location.href = page; }
     </script>
 </body>
 </html>

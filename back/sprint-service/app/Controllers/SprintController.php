@@ -17,6 +17,11 @@ class SprintController
         return Sprint::findOrFail($id);
     }
 
+    public function get(int $id): Sprint
+    {
+        return $this->get_sprint($id);
+    }
+
     public function create(array $data): Sprint
     {
         $sprint = new Sprint();
