@@ -42,18 +42,22 @@ CREATE TABLE IF NOT EXISTS `retrospective_participants` (
 -- DATOS DE PRUEBA
 -- ============================================================
 
-INSERT INTO `retrospectives` (`sprint_id`, `facilitator`, `date`, `duration_minutes`, `status`, `notes`) VALUES
+INSERT IGNORE INTO `retrospectives` (`sprint_id`, `facilitator`, `date`, `duration_minutes`, `status`, `notes`) VALUES
 (1, 'María González', '2026-01-14', 90, 'completed', 'Buena participación del equipo. Se identificaron 3 acciones clave.'),
 (2, 'María González', '2026-01-28', 75, 'completed', 'Equipo más confiado. Mejor estimación de tareas.'),
 (5, 'Juan Pérez', '2026-01-14', 60, 'completed', 'Diseño system aprobado por stakeholders.'),
 (6, 'Juan Pérez', '2026-01-28', 90, 'completed', 'Buen feedback de UX testing.');
 
-INSERT INTO `retrospective_participants` (`retrospective_id`, `name`, `role`) VALUES
-(1, 'María González', 'scrum_master'),
-(1, 'Carlos Ruiz', 'product_owner'),
-(1, 'Pedro Martín', 'developer'),
-(1, 'Laura Sánchez', 'developer'),
-(2, 'María González', 'scrum_master'),
-(2, 'Carlos Ruiz', 'product_owner'),
-(3, 'Juan Pérez', 'scrum_master'),
-(3, 'Ana López', 'product_owner');
+INSERT INTO `retrospective_participants` (`retrospective_id`, `name`, `role`)
+SELECT seed.`retrospective_id`, seed.`name`, seed.`role`
+FROM (
+    SELECT 1 AS `retrospective_id`, 'María González' AS `name`, 'scrum_master' AS `role`
+    UNION ALL SELECT 1, 'Carlos Ruiz', 'product_owner'
+    UNION ALL SELECT 1, 'Pedro Martín', 'developer'
+    UNION ALL SELECT 1, 'Laura Sánchez', 'developer'
+    UNION ALL SELECT 2, 'María González', 'scrum_master'
+    UNION ALL SELECT 2, 'Carlos Ruiz', 'product_owner'
+    UNION ALL SELECT 3, 'Juan Pérez', 'scrum_master'
+    UNION ALL SELECT 3, 'Ana López', 'product_owner'
+) AS seed
+WHERE NOT EXISTS (SELECT 1 FROM `retrospective_participants`);

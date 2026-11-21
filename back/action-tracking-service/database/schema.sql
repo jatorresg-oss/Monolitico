@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `action_tracking` (
 -- DATOS DE PRUEBA
 -- ============================================================
 
-INSERT INTO `action_tracking` (`original_feedback_id`, `review_sprint_id`, `status`, `completion_percentage`, `comments`, `reviewed_by`) VALUES
+INSERT IGNORE INTO `action_tracking` (`original_feedback_id`, `review_sprint_id`, `status`, `completion_percentage`, `comments`, `reviewed_by`) VALUES
 (5, 2, 'completed', 100, 'DoD documentada y aprobada por todo el equipo', 'María González'),
 (6, 2, 'completed', 100, 'Workshop realizado, estimaciones mejoraron notablemente', 'María González'),
 (7, 2, 'completed', 100, 'Dailys ahora duran 12-14 min consistentemente', 'Equipo completo'),

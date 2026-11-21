@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul
+cd /d "%~dp0"
 echo ============================================================
 echo Instalando Retrospectivas Microservicios
 echo ============================================================
@@ -71,30 +72,14 @@ if %errorlevel% neq 0 (
 )
 cd ..\..
 
-echo [5/5] Creando bases de datos y tablas...
+echo [5/5] Creando la base de datos y las tablas...
 echo.
-echo [5a] Creando sprints_db...
-"%MYSQL_PATH%" -u root -e "source ..\back\sprint-service\database\schema.sql"
-if %errorlevel% neq 0 (
-    echo ADVERTENCIA: Error creando sprints_db (¿MySQL corriendo?)
-)
-
-echo [5b] Creando retrospectives_db...
-"%MYSQL_PATH%" -u root -e "source ..\back\retrospective-service\database\schema.sql"
-if %errorlevel% neq 0 (
-    echo ADVERTENCIA: Error creando retrospectives_db
-)
-
-echo [5c] Creando feedback_db...
-"%MYSQL_PATH%" -u root -e "source ..\back\feedback-service\database\schema.sql"
-if %errorlevel% neq 0 (
-    echo ADVERTENCIA: Error creando feedback_db
-)
-
-echo [5d] Creando action_tracking_db...
-"%MYSQL_PATH%" -u root -e "source ..\back\action-tracking-service\database\schema.sql"
-if %errorlevel% neq 0 (
-    echo ADVERTENCIA: Error creando action_tracking_db
+echo Creando registro_retro_db con sprints y retro_items...
+"%MYSQL_PATH%" -u root < "back\sprint-service\database\schema.sql"
+if errorlevel 1 (
+    echo ERROR creando registro_retro_db. Verifique que MySQL este corriendo.
+    pause
+    exit /b 1
 )
 
 echo.

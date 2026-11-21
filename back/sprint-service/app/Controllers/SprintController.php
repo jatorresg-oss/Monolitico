@@ -37,15 +37,9 @@ class SprintController
     {
         $sprint = Sprint::findOrFail($id);
 
-        if (isset($data['nombre'])) {
-            $sprint->nombre = trim($data['nombre']);
-        }
-        if (isset($data['fecha_inicio'])) {
-            $sprint->fecha_inicio = $data['fecha_inicio'];
-        }
-        if (isset($data['fecha_fin'])) {
-            $sprint->fecha_fin = $data['fecha_fin'];
-        }
+        if (isset($data['nombre'])) $sprint->nombre = trim($data['nombre']);
+        if (isset($data['fecha_inicio'])) $sprint->fecha_inicio = $data['fecha_inicio'];
+        if (isset($data['fecha_fin'])) $sprint->fecha_fin = $data['fecha_fin'];
 
         $sprint->save();
 

@@ -8,6 +8,7 @@ import {
     getFeedbackByRetrospective,
     createRetrospective,
     createFeedbackBulk,
+    deleteFeedback,
     getPendingActions,
     createActionTracking,
     checkAllServices,

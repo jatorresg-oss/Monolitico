@@ -36,7 +36,7 @@ class SprintRepository
     public function create(Request $request, Response $response, $args): Response
     {
         try {
-            $data = $this->body($request);
+            $data = $this->normalize($this->body($request));
             $errors = $this->validate($data);
             if ($errors) {
                 return $this->error($response, implode(' ', $errors), 422);
@@ -53,7 +53,7 @@ class SprintRepository
     {
         try {
             $id = (int) $args['id'];
-            $data = $this->body($request);
+            $data = $this->normalize($this->body($request));
             $current = Sprint::findOrFail($id);
             $merged = array_merge($current->toArray(), $data);
             $errors = $this->validate($merged, true);
@@ -118,6 +118,22 @@ class SprintRepository
         }
 
         return $errors;
+    }
+
+    private function normalize(array $data): array
+    {
+        foreach ([
+            'nombre' => 'name',
+            'fecha_inicio' => 'start_date',
+            'fecha_fin' => 'end_date',
+        ] as $field => $legacyField) {
+            if (!array_key_exists($field, $data) && array_key_exists($legacyField, $data)) {
+                $data[$field] = $data[$legacyField];
+            }
+            unset($data[$legacyField]);
+        }
+
+        return $data;
     }
 
     private function isDate(string $value): bool

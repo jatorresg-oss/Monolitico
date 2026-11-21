@@ -31,28 +31,29 @@ CREATE TABLE IF NOT EXISTS `feedback_items` (
 -- DATOS DE PRUEBA
 -- ============================================================
 
-INSERT INTO `feedback_items` (`retrospective_id`, `type`, `title`, `description`, `priority`, `assignee`, `due_date`, `order_index`) VALUES
-(1, 'positive', 'Buena comunicación', 'El equipo se comunicó bien durante el sprint', 'medium', NULL, NULL, 1),
-(1, 'positive', 'CI/CD funcionando', 'Pipeline automatizado desde día 1', 'medium', NULL, NULL, 2),
-(1, 'negative', 'Estimaciones imprecisas', 'Las historias se subestimaron consistentemente', 'high', NULL, NULL, 1),
-(1, 'negative', 'Falta de definición de done', 'No teníamos criterios claros de finalización', 'high', NULL, NULL, 2),
-(1, 'action', 'Definir Definition of Done', 'Crear checklist compartido para DoD', 'high', 'María González', '2026-01-21', 1),
-(1, 'action', 'Workshop de estimación', 'Sesión de Planning Poker para mejorar estimaciones', 'medium', 'Carlos Ruiz', '2026-01-21', 2),
-(1, 'action', 'Daily standups más enfocadas', 'Limitar a 15 min estrictos, solo bloqueos', 'low', 'Equipo completo', '2026-01-16', 3),
-(1, 'comment', 'Buen ambiente de trabajo', 'El equipo disfrutó colaborando', 'low', NULL, NULL, 1),
-
-(2, 'positive', 'DoD implementada', 'Definition of Done ayudó a cerrar historias', 'medium', NULL, NULL, 1),
-(2, 'positive', 'Mejor estimación', 'Planning Poker mejoró precisión en 40%', 'medium', NULL, NULL, 2),
-(2, 'negative', 'Pruebas lentas', 'Suite de tests tarda >10 min', 'high', NULL, NULL, 1),
-(2, 'negative', 'Merge conflicts frecuentes', 'Ramitas de vida larga causan conflictos', 'medium', NULL, NULL, 2),
-(2, 'action', 'Optimizar tests', 'Paralelizar suite y eliminar tests frágiles', 'high', 'DevOps', '2026-02-04', 1),
-(2, 'action', 'Trunk-based development', 'Adoptar commits pequeños a main', 'medium', 'Equipo completo', '2026-02-04', 2),
-
-(3, 'positive', 'Diseño system consistente', 'Componentes reutilizables aceleran desarrollo', 'medium', NULL, NULL, 1),
-(3, 'positive', 'Buena colaboración diseño-dev', 'Handoff fluido con Figma', 'medium', NULL, NULL, 2),
-(3, 'negative', 'Accesibilidad pendiente', 'No validamos WCAG en componentes', 'high', NULL, NULL, 1),
-(3, 'action', 'Auditoría accesibilidad', 'Revisar todos los componentes vs WCAG 2.1 AA', 'high', 'Ana López', '2026-01-21', 1),
-
-(4, 'positive', 'Accesibilidad mejorada', 'Componentes base cumplen WCAG AA', 'medium', NULL, NULL, 1),
-(4, 'negative', 'Tests visuales faltantes', 'No hay regression testing visual', 'medium', NULL, NULL, 1),
-(4, 'action', 'Implementar Chromatic/Storybook', 'Visual testing automatizado', 'medium', 'Juan Pérez', '2026-02-04', 1);
+INSERT INTO `feedback_items` (`retrospective_id`, `type`, `title`, `description`, `priority`, `assignee`, `due_date`, `order_index`)
+SELECT seed.*
+FROM (
+    SELECT 1 AS `retrospective_id`, 'positive' AS `type`, 'Buena comunicación' AS `title`, 'El equipo se comunicó bien durante el sprint' AS `description`, 'medium' AS `priority`, NULL AS `assignee`, NULL AS `due_date`, 1 AS `order_index`
+    UNION ALL SELECT 1, 'positive', 'CI/CD funcionando', 'Pipeline automatizado desde día 1', 'medium', NULL, NULL, 2
+    UNION ALL SELECT 1, 'negative', 'Estimaciones imprecisas', 'Las historias se subestimaron consistentemente', 'high', NULL, NULL, 1
+    UNION ALL SELECT 1, 'negative', 'Falta de definición de done', 'No teníamos criterios claros de finalización', 'high', NULL, NULL, 2
+    UNION ALL SELECT 1, 'action', 'Definir Definition of Done', 'Crear checklist compartido para DoD', 'high', 'María González', '2026-01-21', 1
+    UNION ALL SELECT 1, 'action', 'Workshop de estimación', 'Sesión de Planning Poker para mejorar estimaciones', 'medium', 'Carlos Ruiz', '2026-01-21', 2
+    UNION ALL SELECT 1, 'action', 'Daily standups más enfocadas', 'Limitar a 15 min estrictos, solo bloqueos', 'low', 'Equipo completo', '2026-01-16', 3
+    UNION ALL SELECT 1, 'comment', 'Buen ambiente de trabajo', 'El equipo disfrutó colaborando', 'low', NULL, NULL, 1
+    UNION ALL SELECT 2, 'positive', 'DoD implementada', 'Definition of Done ayudó a cerrar historias', 'medium', NULL, NULL, 1
+    UNION ALL SELECT 2, 'positive', 'Mejor estimación', 'Planning Poker mejoró precisión en 40%', 'medium', NULL, NULL, 2
+    UNION ALL SELECT 2, 'negative', 'Pruebas lentas', 'Suite de tests tarda >10 min', 'high', NULL, NULL, 1
+    UNION ALL SELECT 2, 'negative', 'Merge conflicts frecuentes', 'Ramitas de vida larga causan conflictos', 'medium', NULL, NULL, 2
+    UNION ALL SELECT 2, 'action', 'Optimizar tests', 'Paralelizar suite y eliminar tests frágiles', 'high', 'DevOps', '2026-02-04', 1
+    UNION ALL SELECT 2, 'action', 'Trunk-based development', 'Adoptar commits pequeños a main', 'medium', 'Equipo completo', '2026-02-04', 2
+    UNION ALL SELECT 3, 'positive', 'Diseño system consistente', 'Componentes reutilizables aceleran desarrollo', 'medium', NULL, NULL, 1
+    UNION ALL SELECT 3, 'positive', 'Buena colaboración diseño-dev', 'Handoff fluido con Figma', 'medium', NULL, NULL, 2
+    UNION ALL SELECT 3, 'negative', 'Accesibilidad pendiente', 'No validamos WCAG en componentes', 'high', NULL, NULL, 1
+    UNION ALL SELECT 3, 'action', 'Auditoría accesibilidad', 'Revisar todos los componentes vs WCAG 2.1 AA', 'high', 'Ana López', '2026-01-21', 1
+    UNION ALL SELECT 4, 'positive', 'Accesibilidad mejorada', 'Componentes base cumplen WCAG AA', 'medium', NULL, NULL, 1
+    UNION ALL SELECT 4, 'negative', 'Tests visuales faltantes', 'No hay regression testing visual', 'medium', NULL, NULL, 1
+    UNION ALL SELECT 4, 'action', 'Implementar Chromatic/Storybook', 'Visual testing automatizado', 'medium', 'Juan Pérez', '2026-02-04', 1
+) AS seed
+WHERE NOT EXISTS (SELECT 1 FROM `feedback_items`);

@@ -3,90 +3,170 @@
 namespace App\Controllers;
 
 use App\Models\FeedbackItem;
-use App\Models\Retrospective;
-use Illuminate\Database\Eloquent\Collection;
-use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 class FeedbackController
 {
-    function get_by_retrospective(int $retroId): Collection
+    private const TYPE_TO_CATEGORY = [
+        'positive' => 'logro',
+        'negative' => 'impedimento',
+        'action' => 'accion',
+        'comment' => 'comentario',
+        'other' => 'otro',
+    ];
+
+    private const CATEGORY_TO_TYPE = [
+        'logro' => 'positive',
+        'impedimento' => 'negative',
+        'accion' => 'action',
+        'comentario' => 'comment',
+        'otro' => 'other',
+    ];
+
+    public function get_by_retrospective(int $sprintId): Collection
     {
-        return FeedbackItem::where('retrospective_id', $retroId)
-            ->orderBy('type')
-            ->orderBy('order_index')
-            ->get();
+        return FeedbackItem::where('sprint_id', $sprintId)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (FeedbackItem $item) => $this->format($item));
     }
 
-    function get_by_type(int $retroId, string $type): Collection
+    public function get_by_type(int $sprintId, string $type): Collection
     {
-        return FeedbackItem::where('retrospective_id', $retroId)
-            ->where('type', $type)
-            ->orderBy('order_index')
-            ->get();
+        $category = $this->category($type);
+        return FeedbackItem::where('sprint_id', $sprintId)
+            ->where('categoria', $category)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (FeedbackItem $item) => $this->format($item));
     }
 
-    function get_feedback(int $id): FeedbackItem
+    public function get_feedback(int $id): array
     {
-        return FeedbackItem::findOrFail($id);
+        return $this->format($this->find($id));
     }
 
-    function create(array $data): FeedbackItem
+    public function create(array $data): array
     {
-        Retrospective::findOrFail($data['retrospective_id']);
-        
-        $feedback = new FeedbackItem();
-        $feedback->retrospective_id = $data['retrospective_id'];
-        $feedback->type = $data['type'];
-        $feedback->title = $data['title'];
-        $feedback->description = $data['description'] ?? null;
-        $feedback->priority = $data['priority'] ?? 'medium';
-        $feedback->assignee = $data['assignee'] ?? null;
-        $feedback->due_date = $data['due_date'] ?? null;
-        $feedback->order_index = $data['order_index'] ?? 0;
-        $feedback->save();
-        return $feedback;
-    }
-
-    function create_bulk(array $data): array
-    {
-        Retrospective::findOrFail($data['retrospective_id']);
-        
-        $items = [];
-        foreach ($data['items'] as $itemData) {
-            $feedback = new FeedbackItem();
-            $feedback->retrospective_id = $data['retrospective_id'];
-            $feedback->type = $itemData['type'];
-            $feedback->title = $itemData['title'];
-            $feedback->description = $itemData['description'] ?? null;
-            $feedback->priority = $itemData['priority'] ?? 'medium';
-            $feedback->assignee = $itemData['assignee'] ?? null;
-            $feedback->due_date = $itemData['due_date'] ?? null;
-            $feedback->order_index = $itemData['order_index'] ?? 0;
-            $feedback->save();
-            $items[] = $feedback;
+        $normalized = $this->normalize($data);
+        if (empty($normalized['sprint_id']) || empty($normalized['categoria']) || $normalized['descripcion'] === '') {
+            throw new InvalidArgumentException('Se requieren sprint_id, categoria y descripcion.');
         }
-        return $items;
+
+        $item = new FeedbackItem();
+        $item->sprint_id = (int) $normalized['sprint_id'];
+        $item->categoria = $this->category($normalized['categoria']);
+        $item->descripcion = $normalized['descripcion'];
+        $item->cumplida = $normalized['cumplida'] ?? null;
+        $item->fecha_revision = $normalized['fecha_revision'] ?? null;
+        $item->save();
+
+        return $this->format($item);
     }
 
-    function update(int $id, array $data): FeedbackItem
+    public function create_bulk(array $data): array
     {
-        $feedback = FeedbackItem::findOrFail($id);
-        
-        if (isset($data['title'])) $feedback->title = $data['title'];
-        if (isset($data['description'])) $feedback->description = $data['description'];
-        if (isset($data['priority'])) $feedback->priority = $data['priority'];
-        if (isset($data['assignee'])) $feedback->assignee = $data['assignee'];
-        if (isset($data['due_date'])) $feedback->due_date = $data['due_date'];
-        if (isset($data['order_index'])) $feedback->order_index = $data['order_index'];
-        
-        $feedback->save();
-        return $feedback;
+        $sprintId = $data['sprint_id'] ?? $data['retrospective_id'] ?? null;
+        if (!$sprintId || empty($data['items']) || !is_array($data['items'])) {
+            throw new InvalidArgumentException('Se requieren sprint_id y una lista items.');
+        }
+
+        $created = [];
+        foreach ($data['items'] as $itemData) {
+            $itemData['sprint_id'] = $sprintId;
+            $created[] = $this->create($itemData);
+        }
+
+        return $created;
     }
 
-    function delete(int $id): FeedbackItem
+    public function update(int $id, array $data): array
     {
-        $feedback = FeedbackItem::findOrFail($id);
-        $feedback->delete();
-        return $feedback;
+        $item = $this->find($id);
+        $normalized = $this->normalize($data);
+
+        if (array_key_exists('categoria', $normalized)) {
+            $item->categoria = $this->category($normalized['categoria']);
+        }
+        if (array_key_exists('descripcion', $normalized)) {
+            if (trim((string) $normalized['descripcion']) === '') {
+                throw new InvalidArgumentException('La descripción no puede estar vacía.');
+            }
+            $item->descripcion = $normalized['descripcion'];
+        }
+        if (array_key_exists('cumplida', $normalized)) {
+            $item->cumplida = $normalized['cumplida'];
+        }
+        if (array_key_exists('fecha_revision', $normalized)) {
+            $item->fecha_revision = $normalized['fecha_revision'];
+        }
+        if (array_key_exists('sprint_id', $normalized)) {
+            $item->sprint_id = (int) $normalized['sprint_id'];
+        }
+
+        $item->save();
+        return $this->format($item);
+    }
+
+    public function delete(int $id): array
+    {
+        $item = $this->find($id);
+        $result = $this->format($item);
+        $item->delete();
+        return $result;
+    }
+
+    private function find(int $id): FeedbackItem
+    {
+        $item = FeedbackItem::find($id);
+        if (!$item) {
+            throw (new ModelNotFoundException())->setModel(FeedbackItem::class, [$id]);
+        }
+        return $item;
+    }
+
+    private function normalize(array $data): array
+    {
+        $data['sprint_id'] = $data['sprint_id'] ?? $data['retrospective_id'] ?? null;
+        $data['categoria'] = $data['categoria'] ?? $data['type'] ?? null;
+        $data['descripcion'] = $data['descripcion'] ?? $data['description'] ?? $data['title'] ?? null;
+        $data['fecha_revision'] = $data['fecha_revision'] ?? $data['due_date'] ?? null;
+        return $data;
+    }
+
+    private function category(string $value): string
+    {
+        $category = self::TYPE_TO_CATEGORY[$value] ?? $value;
+        if (!array_key_exists($category, self::CATEGORY_TO_TYPE)) {
+            throw new InvalidArgumentException('Categoría inválida.');
+        }
+        return $category;
+    }
+
+    private function format(FeedbackItem $item): array
+    {
+        $row = $item->toArray();
+        $type = self::CATEGORY_TO_TYPE[$row['categoria']];
+
+        return [
+            'id' => $row['id'],
+            'sprint_id' => $row['sprint_id'],
+            'retrospective_id' => $row['sprint_id'],
+            'categoria' => $row['categoria'],
+            'type' => $type,
+            'descripcion' => $row['descripcion'],
+            'description' => $row['descripcion'],
+            'title' => $row['descripcion'],
+            'cumplida' => $row['cumplida'],
+            'fecha_revision' => $row['fecha_revision'],
+            'due_date' => $row['fecha_revision'],
+            'created_at' => $row['created_at'],
+            'updated_at' => $row['updated_at'],
+            'priority' => 'medium',
+            'assignee' => null,
+            'order_index' => $row['id'],
+        ];
     }
 }

@@ -6,36 +6,17 @@ Aplicación para registro y seguimiento de retrospectivas Scrum, construida con 
 
 | Servicio | Puerto | Responsabilidad |
 |----------|--------|-----------------|
-| `sprint-service` | 3001 | CRUD Sprints + Teams |
-| `retrospective-service` | 3002 | CRUD Retrospectivas + Participantes |
-| `feedback-service` | 3003 | Ítems: Logros, Impedimentos, Acciones, Comentarios |
-| `action-tracking-service` | 3004 | Seguimiento de cumplimiento de acciones entre sprints |
+| `sprint-service` | 3001 | CRUD de sprints |
+| `retrospective-service` | 3002 | Consulta virtual de retrospectivas por sprint |
+| `feedback-service` | 3003 | CRUD de ítems de retrospectiva |
+| `action-tracking-service` | 3004 | Actualiza el cumplimiento de acciones |
 
-Todos los servicios comparten la base de datos **`retrospectivas_db`** (se crea automáticamente).
+Todos los servicios comparten **`registro_retro_db`**. El esquema compatible contiene `sprints` y `retro_items`; cada retrospectiva se identifica por el sprint y no se guarda en una tabla adicional.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-                        FRONTEND (JS Vanilla)                     
-                    http://localhost/retro-app/                   
-└─────────────────────────────────────────────────────────────────┘
-         │                    │                    │
-    ┌────┴────┐          ┌────┴────┐          ┌────┴────┐
-    ▼         ▼          ▼         ▼          ▼         ▼
-┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
-│ Sprint  │ │Retro-   │ │Feedback │ │Action   │ │ Shared  │
-│ Service │ │spective │ │ Service │ │Tracking │ │  DB     │
-│  :3001  │ │Service  │ │  :3003  │ │ :3004   │ │retros_  │
-└─────────┘ └─────────┘ └─────────┘ └─────────┘ │pectivas_│
-    │         │         │         │              │   db    │
-    └─────────┴─────────┴─────────┴──────────────┘         │
-                              │                  
-                    ┌─────────┴─────────┐
-                    ▼                   ▼
-            ┌───────────────┐   ┌───────────────┐
-            │ MySQL         │   │ MySQL         │
-            │ (retrospectivas_db)             │
-            │ Compartida    │   │ (esquemas)    │
-            └───────────────┘   └───────────────┘
+Frontend (JS) → Servicios :3001–:3004 → MySQL `registro_retro_db`
+
+Tablas: `sprints` y `retro_items` (items relacionados con sprint_id).
 ```
 
 ## Requisitos
@@ -61,8 +42,8 @@ install.bat
 ```
 Este script:
 - Instala dependencias de los 4 servicios
-- Crea la BD `retrospectivas_db` y todas las tablas
-- Carga datos de prueba (seed data)
+- Crea `registro_retro_db` y las tablas `sprints` y `retro_items` si no existen
+- Conserva los datos existentes y no agrega datos de prueba
 
 ### 3. Iniciar servicios
 ```bash
@@ -137,6 +118,8 @@ PUT    /feedbacks/{id}                                 # Actualizar
 DELETE /feedbacks/{id}                                 # Eliminar
 ```
 Tipos: `positive` (Logro), `negative` (Impedimento), `action` (Acción), `comment` (Comentario)
+
+La API mapea esos tipos a `retro_items.categoria` (`logro`, `impedimento`, `accion`, `comentario`). El estado de acción se guarda en `cumplida` y su fecha en `fecha_revision`. El esquema no almacena estado/notas de la retrospectiva ni un historial independiente de seguimiento.
 
 ### Action Tracking Service (3004)
 ```

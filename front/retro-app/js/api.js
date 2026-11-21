@@ -185,6 +185,18 @@ export async function deleteFeedback(id) {
     return await feedbackApi.delete(`/feedbacks/${id}`);
 }
 
+export async function getItem(id) {
+    return await feedbackApi.get(`/feedbacks/${id}`);
+}
+
+export async function createItem(data) {
+    return await feedbackApi.post('/feedbacks', data);
+}
+
+export async function updateItem(id, data) {
+    return await feedbackApi.put(`/feedbacks/${id}`, data);
+}
+
 // ============================================================
 // Action Tracking Service (puerto 3004) - seguimiento de acciones
 // ============================================================

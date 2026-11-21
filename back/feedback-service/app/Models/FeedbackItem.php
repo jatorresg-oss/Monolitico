@@ -6,15 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class FeedbackItem extends Model
 {
-    protected $table = 'feedback_items';
+    protected $table = 'retro_items';
     public $timestamps = true;
-    protected $fillable = ['retrospective_id', 'type', 'title', 'description', 'priority', 'assignee', 'due_date', 'order_index'];
+    protected $fillable = ['sprint_id', 'categoria', 'descripcion', 'cumplida', 'fecha_revision'];
     protected $casts = [
-        'due_date' => 'date',
+        'cumplida' => 'boolean',
+        'fecha_revision' => 'date:Y-m-d',
     ];
-
-    public function retrospective()
-    {
-        return $this->belongsTo(Retrospective::class, 'retrospective_id');
-    }
 }

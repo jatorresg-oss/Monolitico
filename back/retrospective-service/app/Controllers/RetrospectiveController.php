@@ -2,95 +2,66 @@
 
 namespace App\Controllers;
 
-use App\Models\Retrospective;
-use App\Models\Participant;
-use Illuminate\Database\Eloquent\Collection;
-use Exception;
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class RetrospectiveController
 {
-    function get_retrospectives(): Collection
+    public function get_retrospectives(): array
     {
-        return Retrospective::with('participants')->orderBy('date', 'desc')->get();
+        return Capsule::table('retro_items')
+            ->distinct()
+            ->pluck('sprint_id')
+            ->map(fn ($sprintId) => $this->virtualRetrospective((int) $sprintId))
+            ->all();
     }
 
-    function get_retrospective(int $id): Retrospective
+    public function get_retrospective(int $id): array
     {
-        return Retrospective::with('participants')->findOrFail($id);
+        return $this->virtualRetrospective($id);
     }
 
-    function get_retrospective_by_sprint(int $sprintId): Retrospective
+    public function get_retrospective_by_sprint(int $sprintId): array
     {
-        return Retrospective::with('participants')
-            ->where('sprint_id', $sprintId)
-            ->firstOrFail();
+        return $this->get_retrospective($sprintId);
     }
 
-    function create(array $data): Retrospective
+    public function create(array $data): array
     {
-        $retro = Retrospective::firstOrCreate(
-            ['sprint_id' => $data['sprint_id']],
-            [
-                'facilitator' => $data['facilitator'] ?? null,
-                'date' => $data['date'],
-                'duration_minutes' => $data['duration_minutes'] ?? 60,
-                'status' => $data['status'] ?? 'pending',
-                'notes' => $data['notes'] ?? null,
-            ]
-        );
-
-        if ($retro->wasRecentlyCreated && isset($data['participants']) && is_array($data['participants'])) {
-            foreach ($data['participants'] as $participant) {
-                $p = new Participant();
-                $p->retrospective_id = $retro->id;
-                $p->name = $participant['name'];
-                $p->role = $participant['role'] ?? 'developer';
-                $p->save();
-            }
+        $sprintId = (int) $data['sprint_id'];
+        if (!Capsule::table('sprints')->where('id', $sprintId)->exists()) {
+            throw (new ModelNotFoundException())->setModel('sprints', [$sprintId]);
         }
 
-        return $retro->load('participants');
+        return $this->virtualRetrospective($sprintId);
     }
 
-    function update(int $id, array $data): Retrospective
+    public function delete(int $id): array
     {
-        $retro = Retrospective::findOrFail($id);
-        
-        if (isset($data['facilitator'])) $retro->facilitator = $data['facilitator'];
-        if (isset($data['date'])) $retro->date = $data['date'];
-        if (isset($data['duration_minutes'])) $retro->duration_minutes = $data['duration_minutes'];
-        if (isset($data['status'])) $retro->status = $data['status'];
-        if (isset($data['notes'])) $retro->notes = $data['notes'];
-        
-        $retro->save();
-
-        if (isset($data['participants']) && is_array($data['participants'])) {
-            Participant::where('retrospective_id', $id)->delete();
-            
-            foreach ($data['participants'] as $participant) {
-                $p = new Participant();
-                $p->retrospective_id = $retro->id;
-                $p->name = $participant['name'];
-                $p->role = $participant['role'] ?? 'developer';
-                $p->save();
-            }
+        $sprint = Capsule::table('sprints')->where('id', $id)->first();
+        if (!$sprint) {
+            throw (new ModelNotFoundException())->setModel('sprints', [$id]);
         }
 
-        return $retro->load('participants');
+        Capsule::table('retro_items')->where('sprint_id', $id)->delete();
+        return $this->virtualRetrospective($id);
     }
 
-    function complete(int $id): Retrospective
+    private function virtualRetrospective(int $sprintId): array
     {
-        $retro = Retrospective::findOrFail($id);
-        $retro->status = 'completed';
-        $retro->save();
-        return $retro->load('participants');
-    }
+        $sprint = Capsule::table('sprints')->where('id', $sprintId)->first();
+        if (!$sprint) {
+            throw (new ModelNotFoundException())->setModel('sprints', [$sprintId]);
+        }
 
-    function delete(int $id): Retrospective
-    {
-        $retro = Retrospective::findOrFail($id);
-        $retro->delete();
-        return $retro;
+        $hasItems = Capsule::table('retro_items')->where('sprint_id', $sprintId)->exists();
+
+        return [
+            'id' => $sprintId,
+            'sprint_id' => $sprintId,
+            'date' => $sprint->fecha_fin,
+            'status' => $hasItems ? 'in_progress' : 'pending',
+            'participants' => [],
+        ];
     }
 }

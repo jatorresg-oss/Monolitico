@@ -2,70 +2,121 @@
 
 namespace App\Controllers;
 
-use App\Models\ActionTracking;
-use Illuminate\Database\Eloquent\Collection;
-use Exception;
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 class ActionTrackingController
 {
-    function get_pending_actions(int $sprintId): Collection
+    public function get_pending_actions(int $sprintId): Collection
     {
-        $subquery = ActionTracking::select('original_feedback_id')
-            ->where('review_sprint_id', $sprintId);
-        
-        // Note: This would need cross-service calls in real implementation
-        // For now, return empty - frontend will call feedback-service directly
-        return ActionTracking::where('review_sprint_id', $sprintId)->get();
+        $sprint = Capsule::table('sprints')->where('id', $sprintId)->first();
+        if (!$sprint) {
+            throw (new ModelNotFoundException())->setModel('sprints', [$sprintId]);
+        }
+
+        return Capsule::table('retro_items')
+            ->join('sprints as source_sprints', 'retro_items.sprint_id', '=', 'source_sprints.id')
+            ->where('retro_items.categoria', 'accion')
+            ->where('source_sprints.fecha_fin', '<', $sprint->fecha_inicio)
+            ->where(function ($query) {
+                $query->whereNull('retro_items.cumplida')->orWhere('retro_items.cumplida', false);
+            })
+            ->where(function ($query) use ($sprint) {
+                $query->whereNull('retro_items.fecha_revision')
+                    ->orWhere('retro_items.fecha_revision', '<=', $sprint->fecha_inicio);
+            })
+            ->select('retro_items.*', 'source_sprints.nombre as sprint_nombre')
+            ->orderBy('retro_items.id')
+            ->get()
+            ->map(fn ($item) => $this->format($item));
     }
 
-    function get_tracking_by_sprint(int $sprintId): Collection
+    public function get_tracking_by_sprint(int $sprintId): Collection
     {
-        return ActionTracking::where('review_sprint_id', $sprintId)->get();
+        return Capsule::table('retro_items')
+            ->where('sprint_id', $sprintId)
+            ->where('categoria', 'accion')
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($item) => $this->format($item));
     }
 
-    function get_tracking_history(int $feedbackId): Collection
+    public function get_tracking_history(int $feedbackId): Collection
     {
-        return ActionTracking::where('original_feedback_id', $feedbackId)
-            ->orderBy('reviewed_at', 'desc')
-            ->get();
+        $item = Capsule::table('retro_items')
+            ->where('id', $feedbackId)
+            ->where('categoria', 'accion')
+            ->first();
+
+        return collect($item ? [$this->format($item)] : []);
     }
 
-    function create(array $data): ActionTracking
+    public function create(array $data): array
     {
-        $tracking = new ActionTracking();
-        $tracking->original_feedback_id = $data['original_feedback_id'];
-        $tracking->review_sprint_id = $data['review_sprint_id'];
-        $tracking->status = $data['status'];
-        $tracking->completion_percentage = $data['completion_percentage'] ?? 0;
-        $tracking->comments = $data['comments'] ?? null;
-        $tracking->reviewed_by = $data['reviewed_by'] ?? null;
-        $tracking->save();
-        
-        return $tracking;
+        return $this->setCompletion(
+            (int) $data['original_feedback_id'],
+            $data['status'] === 'completed'
+        );
     }
 
-    function update(int $id, array $data): ActionTracking
+    public function update(int $id, array $data): array
     {
-        $tracking = ActionTracking::findOrFail($id);
-        
-        if (isset($data['status'])) $tracking->status = $data['status'];
-        if (isset($data['completion_percentage'])) $tracking->completion_percentage = $data['completion_percentage'];
-        if (isset($data['comments'])) $tracking->comments = $data['comments'];
-        if (isset($data['reviewed_by'])) $tracking->reviewed_by = $data['reviewed_by'];
-        
-        $tracking->save();
-        return $tracking;
+        if (!isset($data['status']) || !in_array($data['status'], ['completed', 'partial', 'not_completed', 'carried_over'], true)) {
+            throw new InvalidArgumentException('Status inválido.');
+        }
+
+        return $this->setCompletion($id, $data['status'] === 'completed');
     }
 
-    function delete(int $id): ActionTracking
+    public function delete(int $id): void
     {
-        $tracking = ActionTracking::findOrFail($id);
-        $tracking->delete();
-        return $tracking;
+        throw new InvalidArgumentException('El esquema retro_items no almacena un historial de seguimiento independiente.');
     }
 
-    function get(int $id): ActionTracking
+    public function get(int $id): array
     {
-        return ActionTracking::findOrFail($id);
+        $item = Capsule::table('retro_items')
+            ->where('id', $id)
+            ->where('categoria', 'accion')
+            ->first();
+        if (!$item) {
+            throw (new ModelNotFoundException())->setModel('retro_items', [$id]);
+        }
+        return $this->format($item);
+    }
+
+    private function setCompletion(int $itemId, bool $completed): array
+    {
+        $item = Capsule::table('retro_items')
+            ->where('id', $itemId)
+            ->where('categoria', 'accion')
+            ->first();
+        if (!$item) {
+            throw (new ModelNotFoundException())->setModel('retro_items', [$itemId]);
+        }
+
+        Capsule::table('retro_items')->where('id', $itemId)->update(['cumplida' => $completed]);
+
+        return $this->get($itemId);
+    }
+
+    private function format($item): array
+    {
+        $completed = $item->cumplida !== null && (bool) $item->cumplida;
+        return [
+            'id' => (int) $item->id,
+            'original_feedback_id' => (int) $item->id,
+            'sprint_id' => (int) $item->sprint_id,
+            'review_sprint_id' => (int) $item->sprint_id,
+            'status' => $completed ? 'completed' : 'not_completed',
+            'completion_percentage' => $completed ? 100 : 0,
+            'description' => $item->descripcion,
+            'title' => $item->descripcion,
+            'created_at' => $item->created_at,
+            'fecha_revision' => $item->fecha_revision,
+            'sprint_nombre' => $item->sprint_nombre ?? null,
+        ];
     }
 }

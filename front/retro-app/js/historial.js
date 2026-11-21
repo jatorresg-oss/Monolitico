@@ -88,12 +88,14 @@ async function loadHistory(sprintId = null) {
                 const retrospective = await getRetrospectiveBySprint(sprint.id);
                 if (retrospective) {
                     const items = await getFeedbackByRetrospective(retrospective.id);
-                    items.forEach(item => {
-                        item.sprint_nombre = sprint.name;
-                        item.sprint_fecha_inicio = sprint.start_date;
-                        item.sprint_fecha_fin = sprint.end_date;
-                    });
-                    allHistory.push({ sprint, retrospective, items });
+                    if (items.length > 0) {
+                        items.forEach(item => {
+                            item.sprint_nombre = sprint.name;
+                            item.sprint_fecha_inicio = sprint.start_date;
+                            item.sprint_fecha_fin = sprint.end_date;
+                        });
+                        allHistory.push({ sprint, retrospective, items });
+                    }
                 }
             } catch (e) {
                 // No retrospective for this sprint
