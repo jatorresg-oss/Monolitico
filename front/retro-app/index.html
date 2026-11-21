@@ -3,43 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="0;url=dashboard.html">
     <title>Retrospectivas Ágiles</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body>
     <div class="app-container">
-        <header class="header">
-            <div class="header-content">
-                <h1><i class="fas fa-tachometer-alt" aria-hidden="true"></i> Retrospectivas Ágiles</h1>
-                <p class="subtitle">Mejora continua para equipos Scrum</p>
+        <main class="main-content" role="main" style="padding: 40px; text-align: center;">
+            <div class="empty-state">
+                <i class="fas fa-tachometer-alt"></i>
+                <h3>Retrospectivas Ágiles</h3>
+                <p>Abriendo el panel de control...</p>
+                <a href="dashboard.html" class="btn btn-primary" style="margin-top: 16px;">
+                    <i class="fas fa-arrow-right" aria-hidden="true"></i> Ir al Dashboard
+                </a>
             </div>
-        </header>
-
-        <nav class="nav-tabs" role="tablist" aria-label="Navegación principal">
-            <button class="tab-btn active" role="tab" aria-selected="true" onclick="navigateTo('dashboard.html')">
-                <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Dashboard
-            </button>
-            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('sprints.html')">
-                <i class="fas fa-calendar-alt" aria-hidden="true"></i> Sprints
-            </button>
-            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('retrospectiva.html')">
-                <i class="fas fa-comments" aria-hidden="true"></i> Retrospectiva
-            </button>
-            <button class="tab-btn" role="tab" aria-selected="false" onclick="navigateTo('historial.html')">
-                <i class="fas fa-history" aria-hidden="true"></i> Historial
-            </button>
-        </nav>
-
-        <main class="main-content" role="main" id="main-content">
-            <div id="dashboard-content"></div>
         </main>
     </div>
-
-    <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
-
-    <script type="module" src="js/inicio.js"></script>
     <script>
-        function navigateTo(page) { window.location.href = page; }
+        window.location.replace('dashboard.html');
     </script>
 </body>
 </html>

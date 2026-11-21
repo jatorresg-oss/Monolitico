@@ -48,3 +48,13 @@ docker-compose.override.yml
 tmp/
 temp/
 *.tmp
+
+# Reference project (professor sample, not part of this app)
+programacion_g1_s2_2026/
+
+# Local binaries / tooling
+opencode.exe
+*.exe
+
+# XAMPP / local run artifacts
+*.pid

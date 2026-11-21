@@ -1,18 +1,19 @@
 /**
- * Dashboard / Inicio - Panel principal con estadísticas
+ * Dashboard / Inicio - Panel principal con estadísticas.
  */
 
-import { 
-    getSprints, 
-    getRetrospectives, 
-    getFeedbackByRetrospective,
+import {
+    getSprints,
+    getAllItems,
+    getFeedbackStats,
     checkAllServices,
     formatDate,
-    showToast 
+    escapeHtml,
+    showToast
 } from './api.js';
 
 let currentSprints = [];
-let currentRetrospectives = [];
+let allItems = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
@@ -25,13 +26,13 @@ async function checkServicesStatus() {
     if (!container) return;
 
     const status = await checkAllServices();
-    
+
     container.innerHTML = `
         <div class="service-badge ${status.sprints ? 'online' : 'offline'}">
             <i class="fas fa-calendar-alt"></i> Sprint Service ${status.sprints ? '●' : '○'}
         </div>
-        <div class="service-badge ${status.retrospectives ? 'online' : 'offline'}">
-            <i class="fas fa-comments"></i> Retrospective Service ${status.retrospectives ? '●' : '○'}
+        <div class="service-badge ${status.retrospective ? 'online' : 'offline'}">
+            <i class="fas fa-comments"></i> Retrospective Service ${status.retrospective ? '●' : '○'}
         </div>
         <div class="service-badge ${status.feedback ? 'online' : 'offline'}">
             <i class="fas fa-list"></i> Feedback Service ${status.feedback ? '●' : '○'}
@@ -43,20 +44,19 @@ async function checkServicesStatus() {
 }
 
 async function loadDashboard() {
+    showLoading(true);
     try {
-        showLoading(true);
-        
-        const [sprints, retrospectives] = await Promise.all([
+        const [sprints, items, stats] = await Promise.all([
             getSprints(),
-            getRetrospectives()
+            getAllItems(),
+            getFeedbackStats()
         ]);
 
         currentSprints = sprints || [];
-        currentRetrospectives = retrospectives || [];
+        allItems = items || [];
 
-        renderStats();
+        renderStats(stats);
         renderRecentSprints();
-        
     } catch (error) {
         console.error('Error loading dashboard:', error);
         showToast('Error al cargar el dashboard', 'error');
@@ -65,19 +65,12 @@ async function loadDashboard() {
     }
 }
 
-function renderStats() {
+function renderStats(stats) {
     const container = document.getElementById('stats-container');
     if (!container) return;
 
-    const completedSprints = currentSprints.filter(s => s.status === 'completed').length;
-    const totalRetrospectives = currentRetrospectives.length;
-    
-    // Count actions from all retrospectives
-    let totalActions = 0;
-    let completedActions = 0;
-    
-    // This would need to fetch feedback for each retrospective
-    // For now, show placeholder
+    const acciones = stats?.acciones || { total: 0, cumplidas: 0, pendientes: 0, tasa_cumplimiento: 0 };
+    const totalItems = stats?.total_items ?? allItems.length;
 
     container.innerHTML = `
         <article class="stat-card">
@@ -90,28 +83,28 @@ function renderStats() {
         <article class="stat-card">
             <div class="stat-icon retrospectives"><i class="fas fa-comments"></i></div>
             <div class="stat-info">
-                <h3>Retrospectivas</h3>
-                <div class="stat-value">${totalRetrospectives}</div>
+                <h3>Items Registrados</h3>
+                <div class="stat-value">${totalItems}</div>
             </div>
         </article>
         <article class="stat-card">
             <div class="stat-icon actions"><i class="fas fa-tasks"></i></div>
             <div class="stat-info">
-                <h3>Sprints Completados</h3>
-                <div class="stat-value">${completedSprints}</div>
+                <h3>Acciones Pendientes</h3>
+                <div class="stat-value">${acciones.pendientes}</div>
             </div>
         </article>
         <article class="stat-card">
             <div class="stat-icon completion"><i class="fas fa-check-circle"></i></div>
             <div class="stat-info">
-                <h3>Tasa Completitud</h3>
-                <div class="stat-value">${currentSprints.length > 0 ? Math.round((completedSprints / currentSprints.length) * 100) : 0}%</div>
+                <h3>Tasa de Cumplimiento</h3>
+                <div class="stat-value">${acciones.tasa_cumplimiento ?? 0}%</div>
             </div>
         </article>
     `;
 }
 
-async function renderRecentSprints() {
+function renderRecentSprints() {
     const container = document.getElementById('recent-sprints');
     if (!container) return;
 
@@ -129,103 +122,46 @@ async function renderRecentSprints() {
         return;
     }
 
-    container.innerHTML = recentSprints.map(sprint => `
-        <article class="sprint-card" data-sprint-id="${sprint.id}">
-            <div class="sprint-card-header">
-                <h3>${escapeHtml(sprint.name)}</h3>
-                <div class="sprint-card-actions">
-                    <a href="retrospectiva.html?sprint_id=${sprint.id}" class="btn btn-sm btn-add">
-                        <i class="fas fa-comments"></i> Retrospectiva
-                    </a>
-                    <a href="sprints.html?id=${sprint.id}" class="btn btn-secondary btn-sm">
-                        <i class="fas fa-edit"></i> Editar
-                    </a>
+    container.innerHTML = recentSprints.map(sprint => {
+        const items = allItems.filter(item => Number(item.sprint_id) === Number(sprint.id));
+        const acciones = items.filter(item => item.categoria === 'accion');
+        const pendientes = acciones.filter(item => !item.cumplida).length;
+
+        return `
+            <article class="sprint-card" data-sprint-id="${sprint.id}">
+                <div class="sprint-card-header">
+                    <h3>${escapeHtml(sprint.nombre)}</h3>
+                    <div class="sprint-card-actions">
+                        <a href="retrospectiva.html?sprint_id=${sprint.id}" class="btn btn-sm btn-add">
+                            <i class="fas fa-comments"></i> Retrospectiva
+                        </a>
+                    </div>
                 </div>
-            </div>
-            <div class="sprint-card-dates">
-                <span><i class="fas fa-play"></i> ${formatDate(sprint.start_date)}</span>
-                <span><i class="fas fa-stop"></i> ${formatDate(sprint.end_date)}</span>
-            </div>
-            <div class="sprint-card-stats">
-                <span class="stat-item"><i class="fas fa-circle" style="color: ${getStatusColor(sprint.status)}"></i> ${getStatusLabel(sprint.status)}</span>
-            </div>
-        </article>
-    `).join('');
-}
-
-function getStatusColor(status) {
-    const colors = {
-        'planned': 'var(--info)',
-        'active': 'var(--primary)',
-        'completed': 'var(--success)',
-        'cancelled': 'var(--danger)'
-    };
-    return colors[status] || 'var(--gray-500)';
-}
-
-function getStatusLabel(status) {
-    const labels = {
-        'planned': 'Planificado',
-        'active': 'Activo',
-        'completed': 'Completado',
-        'cancelled': 'Cancelado'
-    };
-    return labels[status] || status;
+                <div class="sprint-card-dates">
+                    <span><i class="fas fa-play"></i> ${formatDate(sprint.fecha_inicio)}</span>
+                    <span><i class="fas fa-stop"></i> ${formatDate(sprint.fecha_fin)}</span>
+                </div>
+                <div class="sprint-card-stats">
+                    <span class="stat-item"><i class="fas fa-layer-group"></i> ${items.length} items</span>
+                    <span class="stat-item"><i class="fas fa-tasks"></i> ${acciones.length} acciones (${pendientes} pendientes)</span>
+                </div>
+            </article>
+        `;
+    }).join('');
 }
 
 function showLoading(show) {
     const main = document.getElementById('main-content');
-    if (main) {
-        if (show) main.classList.add('loading');
-        else main.classList.remove('loading');
-    }
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function showToast(message, type = 'info') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    const icons = {
-        success: 'fa-check-circle',
-        error: 'fa-exclamation-circle',
-        warning: 'fa-exclamation-triangle',
-        info: 'fa-info-circle'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.setAttribute('role', 'alert');
-    toast.setAttribute('aria-live', 'polite');
-    toast.innerHTML = `
-        <i class="fas ${icons[type] || icons.info} toast-icon" aria-hidden="true"></i>
-        <span class="toast-message">${escapeHtml(message)}</span>
-        <button class="toast-close" aria-label="Cerrar notificación">&times;</button>
-    `;
-
-    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
-    container.appendChild(toast);
-
-    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
+    if (main) main.classList.toggle('loading', show);
 }
 
 function setupKeyboardShortcuts() {
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         if (e.altKey && !e.ctrlKey && !e.metaKey) {
-            if (e.key === 'd') { e.preventDefault(); window.location.href = 'dashboard.html'; }
             if (e.key === 's') { e.preventDefault(); window.location.href = 'sprints.html'; }
             if (e.key === 'r') { e.preventDefault(); window.location.href = 'retrospectiva.html'; }
             if (e.key === 'h') { e.preventDefault(); window.location.href = 'historial.html'; }
-        }
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal.active, .toast').forEach(el => el.remove());
+            if (e.key === 'd') { e.preventDefault(); window.location.href = 'dashboard.html'; }
         }
     });
 }
-
-window.showToast = showToast;

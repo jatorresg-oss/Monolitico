@@ -1,0 +1,163 @@
+# Prueba de endpoints - Retrospectivas Scrum
+# Requiere la extensión "REST Client" de VS Code (humansoftware.rest-client).
+# Cambia el valor de las variables si tus servicios usan otros puertos.
+
+@sprint_host = http://127.0.0.1:3001
+@retro_host = http://127.0.0.1:3002
+@feedback_host = http://127.0.0.1:3003
+@action_host = http://127.0.0.1:3004
+
+### ============================================================
+### Health checks
+### ============================================================
+
+### Sprint service - health
+GET {{sprint_host}}/health
+
+### Retrospective service - health
+GET {{retro_host}}/health
+
+### Feedback service - health
+GET {{feedback_host}}/health
+
+### Action tracking service - health
+GET {{action_host}}/health
+
+### ============================================================
+### Sprint Service (3001)
+### ============================================================
+
+### Listar sprints
+GET {{sprint_host}}/sprints
+
+### Obtener sprint 1
+GET {{sprint_host}}/sprints/1
+
+### Crear sprint
+POST {{sprint_host}}/sprints
+Content-Type: application/json
+
+{
+    "nombre": "Sprint 3 - Mejora continua",
+    "fecha_inicio": "2026-11-01",
+    "fecha_fin": "2026-11-14"
+}
+
+### Actualizar sprint 1
+PUT {{sprint_host}}/sprints/1
+Content-Type: application/json
+
+{
+    "nombre": "Sprint 1 - Fundamentos del producto (actualizado)",
+    "fecha_inicio": "2026-10-01",
+    "fecha_fin": "2026-10-15"
+}
+
+### Eliminar sprint 1 (elimina también sus items por cascada)
+DELETE {{sprint_host}}/sprints/1
+
+### ============================================================
+### Retrospective Service (3002)
+### ============================================================
+
+### Listar todos los items
+GET {{retro_host}}/retro-items
+
+### Filtrar items por query string
+GET {{retro_host}}/retro-items?sprint_id=1&categoria=accion
+
+### Items del sprint 1
+GET {{retro_host}}/retro-items/sprint/1
+
+### Items del sprint 1 por categoría
+GET {{retro_host}}/retro-items/sprint/1/categoria/accion
+
+### Obtener item 1
+GET {{retro_host}}/retro-items/1
+
+### Crear item (logro)
+POST {{retro_host}}/retro-items
+Content-Type: application/json
+
+{
+    "sprint_id": 1,
+    "categoria": "logro",
+    "descripcion": "El equipo completó la historia de usuario a tiempo."
+}
+
+### Crear acción con fecha de revisión
+POST {{retro_host}}/retro-items
+Content-Type: application/json
+
+{
+    "sprint_id": 1,
+    "categoria": "accion",
+    "descripcion": "Agregar pruebas automatizadas a los endpoints.",
+    "cumplida": false,
+    "fecha_revision": "2026-11-20"
+}
+
+### Actualizar item 1
+PUT {{retro_host}}/retro-items/1
+Content-Type: application/json
+
+{
+    "descripcion": "Descripción actualizada desde REST Client",
+    "categoria": "comentario"
+}
+
+### Eliminar item 1
+DELETE {{retro_host}}/retro-items/1
+
+### ============================================================
+### Feedback Service (3003)
+### ============================================================
+
+### Todo el feedback (sin acciones)
+GET {{feedback_host}}/feedbacks
+
+### Feedback del sprint 1
+GET {{feedback_host}}/feedbacks/sprint/1
+
+### Feedback del sprint 1 por categoría
+GET {{feedback_host}}/feedbacks/sprint/1/type/logro
+
+### Resumen del sprint 1
+GET {{feedback_host}}/feedbacks/summary/1
+
+### Estadísticas globales
+GET {{feedback_host}}/feedbacks/stats
+
+### Obtener item 1
+GET {{feedback_host}}/feedbacks/1
+
+### ============================================================
+### Action Tracking Service (3004)
+### ============================================================
+
+### Acciones del sprint 1
+GET {{action_host}}/action-tracking/sprint/1
+
+### Acciones pendientes de sprints anteriores al 2
+GET {{action_host}}/action-tracking/pending/2
+
+### Estadísticas globales de acciones
+GET {{action_host}}/action-tracking/stats
+
+### Estadísticas de acciones del sprint 1
+GET {{action_host}}/action-tracking/stats/1
+
+### Detalle/historial de la acción 3
+GET {{action_host}}/action-tracking/history/3
+
+### Obtener acción 3
+GET {{action_host}}/action-tracking/3
+
+### Marcar cumplimiento de la acción 3 (PATCH)
+PATCH {{action_host}}/action-tracking/3
+Content-Type: application/json
+
+{
+    "cumplida": true,
+    "fecha_revision": "2026-11-21"
+}

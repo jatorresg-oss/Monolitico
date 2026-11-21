@@ -2,41 +2,57 @@
  * Sprints Management Page
  */
 
-import { 
-    getSprints, 
-    createSprint, 
-    updateSprint, 
+import {
+    getSprints,
+    getAllItems,
+    createSprint,
+    updateSprint,
     deleteSprint,
     checkAllServices,
     formatDate,
-    showToast 
+    escapeHtml,
+    showToast
 } from './api.js';
 
 let currentSprints = [];
+let allItems = [];
+let currentSprintId = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
     await loadSprints();
     setupForm();
     setupKeyboardShortcuts();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get('id');
+    if (id) {
+        const sprint = currentSprints.find(s => Number(s.id) === Number(id));
+        if (sprint) openSprintModal(sprint.id);
+    }
 });
 
 async function checkServicesStatus() {
     const status = await checkAllServices();
     const container = document.getElementById('services-status');
-    if (container) {
-        container.innerHTML = `
-            <div class="service-badge ${status.sprints ? 'online' : 'offline'}">
-                <i class="fas fa-calendar-alt"></i> Sprint Service ${status.sprints ? '●' : '○'}
-            </div>
-        `;
-    }
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="service-badge ${status.sprints ? 'online' : 'offline'}">
+            <i class="fas fa-calendar-alt"></i> Sprint Service ${status.sprints ? '●' : '○'}
+        </div>
+        <div class="service-badge ${status.retrospective ? 'online' : 'offline'}">
+            <i class="fas fa-comments"></i> Retrospective Service ${status.retrospective ? '●' : '○'}
+        </div>
+    `;
 }
 
 async function loadSprints() {
+    showLoading(true);
     try {
-        showLoading(true);
-        currentSprints = await getSprints() || [];
+        const [sprints, items] = await Promise.all([getSprints(), getAllItems()]);
+        currentSprints = sprints || [];
+        allItems = items || [];
         renderSprints();
     } catch (error) {
         console.error('Error loading sprints:', error);
@@ -62,55 +78,40 @@ function renderSprints() {
         return;
     }
 
-    container.innerHTML = currentSprints.map(sprint => `
-        <article class="sprint-card" data-sprint-id="${sprint.id}">
-            <div class="sprint-card-header">
-                <h3>${escapeHtml(sprint.name)}</h3>
-                <div class="sprint-card-actions">
-                    <a href="retrospectiva.html?sprint_id=${sprint.id}" class="btn btn-sm btn-add">
-                        <i class="fas fa-comments"></i> Retrospectiva
-                    </a>
-                    <button class="btn btn-secondary btn-sm" onclick="openSprintModal(${sprint.id})">
-                        <i class="fas fa-edit"></i> Editar
-                    </button>
-                    <button class="btn btn-danger btn-sm" onclick="confirmDeleteSprint(${sprint.id}, '${escapeHtml(sprint.name)}')">
-                        <i class="fas fa-trash"></i> Eliminar
-                    </button>
+    container.innerHTML = currentSprints.map(sprint => {
+        const items = allItems.filter(item => Number(item.sprint_id) === Number(sprint.id));
+        const count = categoria => items.filter(item => item.categoria === categoria).length;
+
+        return `
+            <article class="sprint-card" data-sprint-id="${sprint.id}">
+                <div class="sprint-card-header">
+                    <h3>${escapeHtml(sprint.nombre)}</h3>
+                    <div class="sprint-card-actions">
+                        <a href="retrospectiva.html?sprint_id=${sprint.id}" class="btn btn-sm btn-add">
+                            <i class="fas fa-comments"></i> Retrospectiva
+                        </a>
+                        <button class="btn btn-secondary btn-sm" onclick="openSprintModal(${sprint.id})">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="confirmDeleteSprint(${sprint.id})">
+                            <i class="fas fa-trash"></i> Eliminar
+                        </button>
+                    </div>
                 </div>
-            </div>
-            <div class="sprint-card-dates">
-                <span><i class="fas fa-play"></i> ${formatDate(sprint.start_date)}</span>
-                <span><i class="fas fa-stop"></i> ${formatDate(sprint.end_date)}</span>
-            </div>
-            <div class="sprint-card-stats">
-                <span class="stat-item"><i class="fas fa-circle" style="color: ${getStatusColor(sprint.status)}"></i> ${getStatusLabel(sprint.status)}</span>
-            </div>
-        </article>
-    `).join('');
+                <div class="sprint-card-dates">
+                    <span><i class="fas fa-play"></i> ${formatDate(sprint.fecha_inicio)}</span>
+                    <span><i class="fas fa-stop"></i> ${formatDate(sprint.fecha_fin)}</span>
+                </div>
+                <div class="sprint-card-stats">
+                    <span class="stat-item"><i class="fas fa-trophy"></i> ${count('logro')} logros</span>
+                    <span class="stat-item"><i class="fas fa-exclamation-triangle"></i> ${count('impedimento')} impedimentos</span>
+                    <span class="stat-item"><i class="fas fa-tasks"></i> ${count('accion')} acciones</span>
+                    <span class="stat-item"><i class="fas fa-sticky-note"></i> ${count('comentario')} comentarios</span>
+                </div>
+            </article>
+        `;
+    }).join('');
 }
-
-function getStatusColor(status) {
-    const colors = {
-        'planned': 'var(--info)',
-        'active': 'var(--primary)',
-        'completed': 'var(--success)',
-        'cancelled': 'var(--danger)'
-    };
-    return colors[status] || 'var(--gray-500)';
-}
-
-function getStatusLabel(status) {
-    const labels = {
-        'planned': 'Planificado',
-        'active': 'Activo',
-        'completed': 'Completado',
-        'cancelled': 'Cancelado'
-    };
-    return labels[status] || status;
-}
-
-// Modal Management
-let currentSprintId = null;
 
 function openSprintModal(id = null) {
     currentSprintId = id;
@@ -123,12 +124,12 @@ function openSprintModal(id = null) {
 
     if (id) {
         title.innerHTML = '<i class="fas fa-edit"></i> Modificar Sprint';
-        const sprint = currentSprints.find(s => s.id === id);
+        const sprint = currentSprints.find(s => Number(s.id) === Number(id));
         if (sprint) {
             document.getElementById('sprint-id').value = sprint.id;
-            document.getElementById('sprint-name').value = sprint.name;
-            document.getElementById('sprint-start').value = sprint.start_date;
-            document.getElementById('sprint-end').value = sprint.end_date;
+            document.getElementById('sprint-name').value = sprint.nombre;
+            document.getElementById('sprint-start').value = sprint.fecha_inicio;
+            document.getElementById('sprint-end').value = sprint.fecha_fin;
         }
     } else {
         title.innerHTML = '<i class="fas fa-plus"></i> Nuevo Sprint';
@@ -146,19 +147,23 @@ function closeSprintModal() {
 
 async function handleSprintSubmit(e) {
     e.preventDefault();
-    
+
     const id = document.getElementById('sprint-id').value;
     const data = {
-        team_id: 1, // Default team for now
-        name: document.getElementById('sprint-name').value.trim(),
-        start_date: document.getElementById('sprint-start').value,
-        end_date: document.getElementById('sprint-end').value,
-        status: 'planned'
+        nombre: document.getElementById('sprint-name').value.trim(),
+        fecha_inicio: document.getElementById('sprint-start').value,
+        fecha_fin: document.getElementById('sprint-end').value
     };
 
-    const start = data.start_date;
-    const end = data.end_date;
-    if (start && end && start > end) {
+    if (!data.nombre) {
+        showToast('El nombre del sprint es obligatorio', 'error');
+        return;
+    }
+    if (!data.fecha_inicio || !data.fecha_fin) {
+        showToast('Las fechas de inicio y fin son obligatorias', 'error');
+        return;
+    }
+    if (data.fecha_inicio > data.fecha_fin) {
         showToast('La fecha de inicio no puede ser posterior a la fecha de fin', 'error');
         return;
     }
@@ -179,15 +184,18 @@ async function handleSprintSubmit(e) {
         await loadSprints();
     } catch (error) {
         console.error('Error saving sprint:', error);
-        showToast('Error al guardar el sprint', 'error');
+        showToast(error.message || 'Error al guardar el sprint', 'error');
     } finally {
         submitBtn.classList.remove('loading');
         submitBtn.disabled = false;
     }
 }
 
-async function confirmDeleteSprint(id, name) {
-    if (!confirm(`¿Está seguro de eliminar el sprint "${name}"? Se eliminarán también todos sus items de retrospectiva.`)) {
+async function confirmDeleteSprint(id) {
+    const sprint = currentSprints.find(s => Number(s.id) === Number(id));
+    const nombre = sprint ? sprint.nombre : 'este sprint';
+
+    if (!confirm(`¿Está seguro de eliminar el sprint "${nombre}"? Se eliminarán también todos sus items de retrospectiva.`)) {
         return;
     }
 
@@ -197,84 +205,39 @@ async function confirmDeleteSprint(id, name) {
         await loadSprints();
     } catch (error) {
         console.error('Error deleting sprint:', error);
-        showToast('Error al eliminar el sprint', 'error');
+        showToast(error.message || 'Error al eliminar el sprint', 'error');
     }
 }
 
 function setupForm() {
     const form = document.getElementById('sprint-form');
-    if (form) {
-        form.addEventListener('submit', handleSprintSubmit);
-    }
+    if (form) form.addEventListener('submit', handleSprintSubmit);
 
-    // Close modal on overlay click
     document.getElementById('sprint-modal')?.addEventListener('click', (e) => {
         if (e.target.id === 'sprint-modal') closeSprintModal();
     });
 
-    // Close modal on Escape
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeSprintModal();
     });
 }
 
 function setupKeyboardShortcuts() {
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         if (e.altKey && !e.ctrlKey && !e.metaKey) {
             if (e.key === 's') { e.preventDefault(); window.location.href = 'sprints.html'; }
             if (e.key === 'r') { e.preventDefault(); window.location.href = 'retrospectiva.html'; }
             if (e.key === 'h') { e.preventDefault(); window.location.href = 'historial.html'; }
             if (e.key === 'd') { e.preventDefault(); window.location.href = 'dashboard.html'; }
         }
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal.active, .toast').forEach(el => el.remove());
-        }
     });
 }
 
 function showLoading(show) {
     const main = document.getElementById('main-content');
-    if (main) {
-        if (show) main.classList.add('loading');
-        else main.classList.remove('loading');
-    }
+    if (main) main.classList.toggle('loading', show);
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function showToast(message, type = 'info') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    const icons = {
-        success: 'fa-check-circle',
-        error: 'fa-exclamation-circle',
-        warning: 'fa-exclamation-triangle',
-        info: 'fa-info-circle'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.setAttribute('role', 'alert');
-    toast.setAttribute('aria-live', 'polite');
-    toast.innerHTML = `
-        <i class="fas ${icons[type] || icons.info} toast-icon" aria-hidden="true"></i>
-        <span class="toast-message">${escapeHtml(message)}</span>
-        <button class="toast-close" aria-label="Cerrar notificación">&times;</button>
-    `;
-
-    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
-    container.appendChild(toast);
-
-    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
-}
-
-// Global functions for inline onclick
 window.openSprintModal = openSprintModal;
 window.closeSprintModal = closeSprintModal;
 window.confirmDeleteSprint = confirmDeleteSprint;
-window.showToast = showToast;
