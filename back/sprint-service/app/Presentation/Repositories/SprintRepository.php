@@ -3,9 +3,11 @@
 namespace App\Presentation\Repositories;
 
 use App\Controllers\SprintController;
+use App\Models\Sprint;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use Exception;
+use Throwable;
 
 class SprintRepository
 {
@@ -13,92 +15,125 @@ class SprintRepository
     {
         try {
             $controller = new SprintController();
-            $rows = $controller->get_sprints();
-            $response->getBody()->write($rows->toJson());
-            return $response->withHeader("Content-Type", "application/json");
-        } catch (Exception $ex) {
-            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
-            return $response->withStatus(500)->withHeader("Content-Type", "application/json");
+            return $this->json($response, $controller->get_sprints());
+        } catch (Throwable $ex) {
+            return $this->error($response, $ex->getMessage(), 500);
         }
     }
 
     public function get(Request $request, Response $response, $args): Response
     {
         try {
-            $id = $args['id'];
             $controller = new SprintController();
-            $row = $controller->get_sprint($id);
-            $response->getBody()->write($row->toJson());
-            return $response->withHeader("Content-Type", "application/json");
-        } catch (Exception $ex) {
-            $response->getBody()->write(json_encode(['error' => 'Sprint no encontrado']));
-            return $response->withStatus(404)->withHeader("Content-Type", "application/json");
-        }
-    }
-
-    public function getByTeam(Request $request, Response $response, $args): Response
-    {
-        try {
-            $teamId = $args['teamId'];
-            $controller = new SprintController();
-            $rows = $controller->get_sprints_by_team($teamId);
-            $response->getBody()->write($rows->toJson());
-            return $response->withHeader("Content-Type", "application/json");
-        } catch (Exception $ex) {
-            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
-            return $response->withStatus(500)->withHeader("Content-Type", "application/json");
+            return $this->json($response, $controller->get_sprint((int) $args['id']));
+        } catch (ModelNotFoundException $ex) {
+            return $this->error($response, 'Sprint no encontrado', 404);
+        } catch (Throwable $ex) {
+            return $this->error($response, $ex->getMessage(), 500);
         }
     }
 
     public function create(Request $request, Response $response, $args): Response
     {
         try {
-            $body = $request->getBody()->getContents();
-            $data = json_decode($body, true);
-            
-            if (empty($data['team_id']) || empty($data['name']) || empty($data['start_date']) || empty($data['end_date'])) {
-                $response->getBody()->write(json_encode(['error' => 'Faltan campos obligatorios']));
-                return $response->withStatus(400)->withHeader("Content-Type", "application/json");
+            $data = $this->body($request);
+            $errors = $this->validate($data);
+            if ($errors) {
+                return $this->error($response, implode(' ', $errors), 422);
             }
-            
+
             $controller = new SprintController();
-            $row = $controller->create($data);
-            $response->getBody()->write($row->toJson());
-            return $response->withStatus(201)->withHeader("Content-Type", "application/json");
-        } catch (Exception $ex) {
-            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
-            return $response->withStatus(400)->withHeader("Content-Type", "application/json");
+            return $this->json($response, $controller->create($data), 201);
+        } catch (Throwable $ex) {
+            return $this->error($response, $ex->getMessage(), 400);
         }
     }
 
     public function update(Request $request, Response $response, $args): Response
     {
         try {
-            $id = $args['id'];
-            $body = $request->getBody()->getContents();
-            $data = json_decode($body, true);
-            
+            $id = (int) $args['id'];
+            $data = $this->body($request);
+            $current = Sprint::findOrFail($id);
+            $merged = array_merge($current->toArray(), $data);
+            $errors = $this->validate($merged, true);
+            if ($errors) {
+                return $this->error($response, implode(' ', $errors), 422);
+            }
+
             $controller = new SprintController();
-            $row = $controller->update($id, $data);
-            $response->getBody()->write($row->toJson());
-            return $response->withHeader("Content-Type", "application/json");
-        } catch (Exception $ex) {
-            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
-            return $response->withStatus(404)->withHeader("Content-Type", "application/json");
+            return $this->json($response, $controller->update($id, $data));
+        } catch (ModelNotFoundException $ex) {
+            return $this->error($response, 'Sprint no encontrado', 404);
+        } catch (Throwable $ex) {
+            return $this->error($response, $ex->getMessage(), 400);
         }
     }
 
     public function delete(Request $request, Response $response, $args): Response
     {
         try {
-            $id = $args['id'];
             $controller = new SprintController();
-            $row = $controller->delete($id);
-            $response->getBody()->write($row->toJson());
-            return $response->withHeader("Content-Type", "application/json");
-        } catch (Exception $ex) {
-            $response->getBody()->write(json_encode(['error' => $ex->getMessage()]));
-            return $response->withStatus(404)->withHeader("Content-Type", "application/json");
+            return $this->json($response, $controller->delete((int) $args['id']));
+        } catch (ModelNotFoundException $ex) {
+            return $this->error($response, 'Sprint no encontrado', 404);
+        } catch (Throwable $ex) {
+            return $this->error($response, $ex->getMessage(), 500);
         }
+    }
+
+    private function body(Request $request): array
+    {
+        $data = json_decode((string) $request->getBody(), true);
+        if (!is_array($data)) {
+            throw new \InvalidArgumentException('El cuerpo de la petición debe ser JSON válido.');
+        }
+        return $data;
+    }
+
+    private function validate(array $data, bool $partial = false): array
+    {
+        $errors = [];
+
+        if (!$partial || array_key_exists('nombre', $data)) {
+            if (!isset($data['nombre']) || trim((string) $data['nombre']) === '') {
+                $errors[] = 'El nombre es obligatorio.';
+            } elseif (mb_strlen(trim((string) $data['nombre'])) > 100) {
+                $errors[] = 'El nombre no puede superar los 100 caracteres.';
+            }
+        }
+
+        foreach (['fecha_inicio', 'fecha_fin'] as $field) {
+            if (!$partial || array_key_exists($field, $data)) {
+                if (empty($data[$field]) || !$this->isDate((string) $data[$field])) {
+                    $errors[] = 'La fecha de ' . ($field === 'fecha_inicio' ? 'inicio' : 'fin') . ' no es válida (formato AAAA-MM-DD).';
+                }
+            }
+        }
+
+        if (empty($errors) && !empty($data['fecha_inicio']) && !empty($data['fecha_fin'])) {
+            if ($data['fecha_inicio'] > $data['fecha_fin']) {
+                $errors[] = 'La fecha de inicio no puede ser posterior a la fecha de fin.';
+            }
+        }
+
+        return $errors;
+    }
+
+    private function isDate(string $value): bool
+    {
+        $date = \DateTime::createFromFormat('Y-m-d', $value);
+        return $date !== false && $date->format('Y-m-d') === $value;
+    }
+
+    private function json(Response $response, $data, int $status = 200): Response
+    {
+        $response->getBody()->write(json_encode($data, JSON_UNESCAPED_UNICODE));
+        return $response->withStatus($status)->withHeader('Content-Type', 'application/json; charset=utf-8');
+    }
+
+    private function error(Response $response, string $message, int $status): Response
+    {
+        return $this->json($response, ['error' => $message], $status);
     }
 }
