@@ -5,7 +5,7 @@ echo Instalando Retrospectivas Microservicios
 echo ============================================================
 echo.
 
-:: Verificar que estamos en el directorio correcto
+REM Verificar que estamos en el directorio correcto
 if not exist "back\sprint-service\composer.json" (
     echo ERROR: Ejecute este script desde la raiz del proyecto
     echo (donde esta install.bat)
@@ -13,16 +13,16 @@ if not exist "back\sprint-service\composer.json" (
     exit /b 1
 )
 
-:: Verificar PHP
+REM Verificar PHP
 php --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ERROR: PHP no encontrado en PATH
+    echo ERROR: No se encuentra php.exe en PATH
     echo Agregue C:\xampp\php al PATH del sistema
     pause
     exit /b 1
-}
+)
 
-:: Verificar MySQL
+REM Verificar MySQL
 set MYSQL_PATH=C:\xampp\mysql\bin\mysql.exe
 if not exist "%MYSQL_PATH%" (
     echo ERROR: No se encuentra mysql.exe en %MYSQL_PATH%
@@ -47,7 +47,7 @@ composer install --no-interaction
 if %errorlevel% neq 0 (
     echo ERROR instalando Retrospective Service
     pause
-    exit / b 1
+    exit /b 1
 )
 cd ..\..
 
@@ -99,7 +99,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo ============================================================
-echo ¡Instalación completada!
+echo Instalación completada!
 echo ============================================================
 echo.
 echo Para iniciar los servicios, ejecute:
