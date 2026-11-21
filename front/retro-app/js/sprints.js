@@ -214,12 +214,6 @@ function showLoading(show) {
     if (main) main.classList.toggle('loading', show);
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
