@@ -6,9 +6,7 @@ import {
     getSprints,
     getRetrospectives,
     checkAllServices,
-    formatDate,
-    escapeHtml,
-    showToast
+    formatDate
 } from './api.js';
 
 let currentSprints = [];

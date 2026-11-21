@@ -88,28 +88,29 @@
 
     <script>
         let currentRetrospectiveId = null;
-        let currentCategoria = 'positive';
+        let currentSprintId = null;
+        let currentCategoria = 'logro';
         let currentItemId = null;
 
         const labels = {
-            'positive': 'Logro',
-            'negative': 'Impedimento',
-            'action': 'Acción',
-            'comment': 'Comentario'
+            'logro': 'Logro',
+            'impedimento': 'Impedimento',
+            'accion': 'Acción',
+            'comentario': 'Comentario'
         };
 
         const icons = {
-            'positive': 'trophy',
-            'negative': 'exclamation-triangle',
-            'action': 'tasks',
-            'comment': 'sticky-note'
+            'logro': 'trophy',
+            'impedimento': 'exclamation-triangle',
+            'accion': 'tasks',
+            'comentario': 'sticky-note'
         };
 
         const colors = {
-            'positive': 'var(--success)',
-            'negative': 'var(--danger)',
-            'action': 'var(--primary)',
-            'comment': 'var(--info)'
+            'logro': 'var(--success)',
+            'impedimento': 'var(--danger)',
+            'accion': 'var(--primary)',
+            'comentario': 'var(--info)'
         };
 
         // Mapear categoría UI a tipo API
@@ -133,6 +134,7 @@
             const params = new URLSearchParams(window.location.search);
             currentCategoria = params.get('categoria') || 'logro';
             if (!labels[currentCategoria]) currentCategoria = 'logro';
+            currentSprintId = params.get('sprint_id') ? parseInt(params.get('sprint_id'), 10) : null;
             currentRetrospectiveId = params.get('retro_id') ? parseInt(params.get('retro_id')) : null;
             currentItemId = params.get('id') ? parseInt(params.get('id')) : null;
         }
@@ -163,10 +165,9 @@
 
             // Update cancel button
             const cancelBtn = document.getElementById('cancel-btn');
-            const retroId = currentRetrospectiveId;
             if (cancelBtn) {
-                cancelBtn.href = retroId
-                    ? `retrospectiva.html?sprint_id=${retroId}`
+                cancelBtn.href = currentSprintId
+                    ? `retrospectiva.html?sprint_id=${currentSprintId}`
                     : 'retrospectiva.html';
             }
         }
@@ -252,8 +253,8 @@
                 document.getElementById('descripcion').value = item.description || item.title;
                 
                 // Map API type to UI category
-                currentCategoria = item.type === 'positive' ? 'logro' : 
-                                  item.type === 'negative' ? 'impedimento' : 
+                currentCategoria = item.type === 'positive' ? 'logro' :
+                                  item.type === 'negative' ? 'impedimento' :
                                   item.type === 'action' ? 'accion' : 'comentario';
                 currentRetrospectiveId = item.retrospective_id;
                 

@@ -13,18 +13,8 @@ class Retrospective extends Model
         'date' => 'date',
     ];
 
-    public function sprint()
-    {
-        return $this->belongsTo(Sprint::class, 'sprint_id');
-    }
-
     public function participants()
     {
         return $this->hasMany(Participant::class, 'retrospective_id');
-    }
-
-    public function feedbackItems()
-    {
-        return $this->hasMany(FeedbackItem::class, 'retrospective_id');
     }
 }

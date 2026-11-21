@@ -9,9 +9,7 @@ import {
     checkAllServices,
     formatDate,
     formatDateTime,
-    isCompleted,
-    escapeHtml,
-    showToast
+    isCompleted
 } from './api.js';
 
 let currentSprints = [];
@@ -33,19 +31,14 @@ const CATEGORY_ICONS = {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
-    await loadSprints();
-    setupFilter();
 
     // Check for sprint_id in URL
     const urlParams = new URLSearchParams(window.location.search);
     const sprintId = urlParams.get('sprint_id');
-    if (sprintId) {
-        document.getElementById('filter-sprint').value = sprintId;
-        filterSprintId = parseInt(sprintId);
-        await loadHistory();
-    } else {
-        await loadHistory();
-    }
+    filterSprintId = sprintId ? parseInt(sprintId, 10) : null;
+    await loadData();
+    setupFilter();
+    if (filterSprintId) document.getElementById('filter-sprint').value = filterSprintId;
 });
 
 async function checkServicesStatus() {
@@ -72,7 +65,7 @@ async function loadData() {
         const [sprints] = await Promise.all([getSprints()]);
         currentSprints = sprints || [];
         renderSprintFilter();
-        await loadHistory();
+        await loadHistory(filterSprintId);
     } catch (error) {
         console.error('Error loading history:', error);
         showToast(error.message || 'Error al cargar el historial', 'error');

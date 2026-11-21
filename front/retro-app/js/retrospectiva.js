@@ -23,6 +23,7 @@ import {
 
 let currentSprints = [];
 let currentSprintId = null;
+let currentRetrospective = null;
 let currentRetrospectiveId = null;
 let previousActions = [];
 
@@ -35,6 +36,13 @@ const CATEGORY_CONFIG = {
     comment: { icon: 'sticky-note', title: 'Comentarios Adicionales', addLabel: 'Agregar comentario' }
 };
 
+const TYPE_TO_CATEGORY = {
+    positive: 'logro',
+    negative: 'impedimento',
+    action: 'accion',
+    comment: 'comentario'
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
     await loadSprints();
@@ -43,10 +51,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Check for sprint_id in URL
     const urlParams = new URLSearchParams(window.location.search);
     const sprintId = urlParams.get('sprint_id');
-    if (sprintId) {
+    if (sprintId && currentSprints.some(sprint => String(sprint.id) === sprintId)) {
         const selector = document.getElementById('sprint-selector');
         selector.value = sprintId;
         await loadRetrospective(parseInt(sprintId));
+    } else if (sprintId) {
+        showToast('El sprint solicitado no existe', 'error');
     }
 });
 
@@ -115,34 +125,25 @@ async function loadRetrospective(sprintId) {
     showLoading(true);
 
     try {
-        // Get retrospective for this sprint
-        let retrospective = null;
-        try {
-            retrospective = await getRetrospectiveBySprint(sprintId);
-        } catch (e) {
-            // No retrospective exists yet
+        let retrospective = await getRetrospectiveBySprint(sprintId);
+        if (!retrospective) {
+            retrospective = await createRetrospective({
+                sprint_id: sprintId,
+                date: new Date().toISOString().slice(0, 10)
+            });
         }
 
-        if (retrospective) {
-            currentRetrospective = retrospective;
-            currentRetrospectiveId = retrospective.id;
-            
-            // Get feedback items for this retrospective
-            const [items, pending] = await Promise.all([
-                getFeedbackByRetrospective(retrospective.id),
-                getPendingActions(sprintId).catch(() => [])
-            ]);
+        currentRetrospective = retrospective;
+        currentRetrospectiveId = retrospective.id;
 
-            previousActions = pending || [];
-            renderRetrospective(items || []);
-            renderPreviousActions();
-        } else {
-            currentRetrospective = null;
-            currentRetrospectiveId = null;
-            renderRetrospective([]);
-            renderPreviousActions();
-        }
+        const [items, pending] = await Promise.all([
+            getFeedbackByRetrospective(retrospective.id),
+            getPendingActions(sprintId).catch(() => [])
+        ]);
 
+        previousActions = pending || [];
+        renderRetrospective(items || []);
+        renderPreviousActions();
     } catch (error) {
         console.error('Error loading retrospective:', error);
         showToast(error.message || 'Error al cargar la retrospectiva', 'error');
@@ -169,13 +170,6 @@ function renderRetrospective(items) {
     });
 
     // Map API types to UI categories
-    const typeToCategory = {
-        positive: 'logro',
-        negative: 'impedimento',
-        action: 'accion',
-        comment: 'comentario'
-    };
-
     const CATEGORY_CONFIG = {
         logro: { icon: 'trophy', title: 'Logros (¿Qué funcionó bien?)', addLabel: 'Agregar logro', type: 'positive' },
         impedimento: { icon: 'exclamation-triangle', title: 'Impedimentos (¿Qué necesita mejorar?)', addLabel: 'Agregar impedimento', type: 'negative' },
@@ -215,7 +209,7 @@ function renderRetrospective(items) {
 }
 
 function renderRetroItem(item, sprintId) {
-    const cat = typeToCategory[item.type] || 'comentario';
+    const cat = TYPE_TO_CATEGORY[item.type] || 'comentario';
     const completed = isCompleted(item);
     const classes = ['retro-item', `categoria-${cat}`];
     if (item.type === 'action') classes.push(completed ? 'cumplida' : 'no-cumplida');
@@ -241,10 +235,10 @@ function renderRetroItem(item, sprintId) {
     }
 
     const catLabels = {
-        positive: 'Logro',
-        negative: 'Impedimento',
-        action: 'Acción',
-        comment: 'Comentario'
+        logro: 'Logro',
+        impedimento: 'Impedimento',
+        accion: 'Acción',
+        comentario: 'Comentario'
     };
 
     return `
@@ -255,7 +249,7 @@ function renderRetroItem(item, sprintId) {
                 <div class="item-meta">${metaParts.join(' ')}</div>
             </div>
             <div class="item-actions">
-                <a href="item_form.html?id=${item.id}&categoria=${typeToCategory[item.type]}&sprint_id=${sprintId}&retro_id=${currentRetrospectiveId}" class="btn btn-icon" aria-label="Editar ${catLabels[cat]}" title="Editar">
+                <a href="item_form.html?id=${item.id}&categoria=${TYPE_TO_CATEGORY[item.type]}&sprint_id=${sprintId}&retro_id=${currentRetrospectiveId}" class="btn btn-icon" aria-label="Editar ${catLabels[cat]}" title="Editar">
                     <i class="fas fa-edit" aria-hidden="true"></i>
                 </a>
                 <button class="btn btn-icon" aria-label="Eliminar ${catLabels[cat]}" title="Eliminar" onclick="confirmDeleteItem(${item.id})">

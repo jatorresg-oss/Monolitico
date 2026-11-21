@@ -9,11 +9,11 @@ import {
     deleteSprint,
     checkAllServices,
     formatDate,
-    escapeHtml,
-    showToast
+    escapeHtml
 } from './api.js';
 
 let currentSprints = [];
+let currentSprintId = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     await checkServicesStatus();
@@ -126,16 +126,16 @@ function openSprintModal(id = null) {
         const sprint = currentSprints.find(s => s.id === id);
         if (sprint) {
             document.getElementById('sprint-id').value = sprint.id;
-            document.getElementById('sprint-name').value = sprint.name;
-            document.getElementById('sprint-start').value = sprint.start_date;
-            document.getElementById('sprint-end').value = sprint.end_date;
+            document.getElementById('nombre').value = sprint.name;
+            document.getElementById('fecha_inicio').value = sprint.start_date;
+            document.getElementById('fecha_fin').value = sprint.end_date;
         }
     } else {
         title.innerHTML = '<i class="fas fa-plus"></i> Nuevo Sprint';
     }
 
     modal.classList.add('active');
-    document.getElementById('sprint-name').focus();
+    document.getElementById('nombre').focus();
 }
 
 function closeSprintModal() {
@@ -149,9 +149,9 @@ async function handleSprintSubmit(e) {
     
     const id = document.getElementById('sprint-id').value;
     const data = {
-        name: document.getElementById('sprint-name').value.trim(),
-        start_date: document.getElementById('sprint-start').value,
-        end_date: document.getElementById('sprint-end').value,
+        name: document.getElementById('nombre').value.trim(),
+        start_date: document.getElementById('fecha_inicio').value,
+        end_date: document.getElementById('fecha_fin').value,
         status: 'planned'
     };
 

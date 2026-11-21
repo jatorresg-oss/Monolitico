@@ -38,7 +38,9 @@ class ApiClient {
 
             if (!response.ok) {
                 const error = await response.json().catch(() => ({}));
-                throw new Error(error.error || error.message || `HTTP ${response.status}`);
+                const apiError = new Error(error.error || error.message || `HTTP ${response.status}`);
+                apiError.status = response.status;
+                throw apiError;
             }
 
             if (response.status === 204) {
@@ -81,7 +83,15 @@ export const actionTrackingApi = new ApiClient(API_BASE.actionTracking);
 // Sprint Service (puerto 3001)
 // ============================================================
 export async function getSprints() {
-    return (await sprintsApi.get('/sprints')) || [];
+    const sprints = (await sprintsApi.get('/sprints')) || [];
+    return sprints.map(sprint => ({
+        ...sprint,
+        name: sprint.name ?? sprint.nombre,
+        nombre: sprint.nombre ?? sprint.name,
+        start_date: sprint.start_date ?? sprint.fecha_inicio,
+        end_date: sprint.end_date ?? sprint.fecha_fin,
+        status: sprint.status ?? 'planned'
+    }));
 }
 
 export async function getSprint(id) {
@@ -89,11 +99,19 @@ export async function getSprint(id) {
 }
 
 export async function createSprint(data) {
-    return await sprintsApi.post('/sprints', data);
+    return await sprintsApi.post('/sprints', {
+        nombre: data.nombre ?? data.name,
+        fecha_inicio: data.fecha_inicio ?? data.start_date,
+        fecha_fin: data.fecha_fin ?? data.end_date
+    });
 }
 
 export async function updateSprint(id, data) {
-    return await sprintsApi.put(`/sprints/${id}`, data);
+    const payload = {};
+    if ('nombre' in data || 'name' in data) payload.nombre = data.nombre ?? data.name;
+    if ('fecha_inicio' in data || 'start_date' in data) payload.fecha_inicio = data.fecha_inicio ?? data.start_date;
+    if ('fecha_fin' in data || 'end_date' in data) payload.fecha_fin = data.fecha_fin ?? data.end_date;
+    return await sprintsApi.put(`/sprints/${id}`, payload);
 }
 
 export async function deleteSprint(id) {
@@ -111,7 +129,7 @@ export async function getRetrospectiveBySprint(sprintId) {
     try {
         return await retrospectivesApi.get(`/retrospectives/sprint/${sprintId}`);
     } catch (e) {
-        if (e.message.includes('404')) return null;
+        if (e.status === 404) return null;
         throw e;
     }
 }
@@ -263,4 +281,36 @@ export function getCategoryColor(categoria) {
 
 export function isCompleted(item) {
     return item.cumplida === true || item.cumplida === 1 || item.cumplida === '1';
+}
+
+export function escapeHtml(value) {
+    const element = document.createElement('div');
+    element.textContent = value ?? '';
+    return element.innerHTML;
+}
+
+export function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const icons = {
+        success: 'fa-check-circle',
+        error: 'fa-exclamation-circle',
+        warning: 'fa-exclamation-triangle',
+        info: 'fa-info-circle'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'polite');
+    toast.innerHTML = `
+        <i class="fas ${icons[type] || icons.info} toast-icon" aria-hidden="true"></i>
+        <span class="toast-message">${escapeHtml(message)}</span>
+        <button class="toast-close" aria-label="Cerrar notificación">&times;</button>
+    `;
+
+    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
+    container.appendChild(toast);
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
 }

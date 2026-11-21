@@ -11,33 +11,35 @@ class RetrospectiveController
 {
     function get_retrospectives(): Collection
     {
-        return Retrospective::with(['sprint.team', 'participants'])->orderBy('date', 'desc')->get();
+        return Retrospective::with('participants')->orderBy('date', 'desc')->get();
     }
 
     function get_retrospective(int $id): Retrospective
     {
-        return Retrospective::with(['sprint.team', 'participants'])->findOrFail($id);
+        return Retrospective::with('participants')->findOrFail($id);
     }
 
     function get_retrospective_by_sprint(int $sprintId): Retrospective
     {
-        return Retrospective::with(['sprint.team', 'participants'])
+        return Retrospective::with('participants')
             ->where('sprint_id', $sprintId)
             ->firstOrFail();
     }
 
     function create(array $data): Retrospective
     {
-        $retro = new Retrospective();
-        $retro->sprint_id = $data['sprint_id'];
-        $retro->facilitator = $data['facilitator'] ?? null;
-        $retro->date = $data['date'];
-        $retro->duration_minutes = $data['duration_minutes'] ?? 60;
-        $retro->status = $data['status'] ?? 'pending';
-        $retro->notes = $data['notes'] ?? null;
-        $retro->save();
+        $retro = Retrospective::firstOrCreate(
+            ['sprint_id' => $data['sprint_id']],
+            [
+                'facilitator' => $data['facilitator'] ?? null,
+                'date' => $data['date'],
+                'duration_minutes' => $data['duration_minutes'] ?? 60,
+                'status' => $data['status'] ?? 'pending',
+                'notes' => $data['notes'] ?? null,
+            ]
+        );
 
-        if (isset($data['participants']) && is_array($data['participants'])) {
+        if ($retro->wasRecentlyCreated && isset($data['participants']) && is_array($data['participants'])) {
             foreach ($data['participants'] as $participant) {
                 $p = new Participant();
                 $p->retrospective_id = $retro->id;
@@ -47,7 +49,7 @@ class RetrospectiveController
             }
         }
 
-        return $retro->load(['sprint.team', 'participants']);
+        return $retro->load('participants');
     }
 
     function update(int $id, array $data): Retrospective
@@ -74,7 +76,7 @@ class RetrospectiveController
             }
         }
 
-        return $retro->load(['sprint.team', 'participants']);
+        return $retro->load('participants');
     }
 
     function complete(int $id): Retrospective
@@ -82,7 +84,7 @@ class RetrospectiveController
         $retro = Retrospective::findOrFail($id);
         $retro->status = 'completed';
         $retro->save();
-        return $retro->load(['sprint.team', 'participants']);
+        return $retro->load('participants');
     }
 
     function delete(int $id): Retrospective
